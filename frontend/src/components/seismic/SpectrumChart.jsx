@@ -157,36 +157,29 @@ function buildV(zone, site, group) {
 // EXPORT HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function exportTxt(hData, vData, zone, site, group, QF, R) {
-  const lines = [
-    "StructCalc — RPA 2024 — Spectre de Réponse de Calcul",
-    "=".repeat(55),
-    `Zone sismique : ${zone}   Site : ${site}   Groupe : ${group}`,
-    `QF = ${QF.toFixed(2)}   R = ${R}`,
-    "",
-    "─── Spectre Horizontal Sad(T)/g — Éq. 3.15 ───",
-    `Palier max : ${hData.peak}   Plancher min : ${hData.floor}`,
-    `T1=${hData.T1}s  T2=${hData.T2}s  T3=${hData.T3}s`,
-    "",
-    "T (s)".padEnd(12) + "Sad/g".padEnd(14) + "Svd/g",
-    "-".repeat(38),
-  ]
-  hData.pts.forEach((h, i) => {
-    const v = vData.pts[i]
-    lines.push(
-      h.T.toFixed(3).padEnd(12) +
-      h.Sa_g.toFixed(5).padEnd(14) +
-      (v ? v.Sa_g.toFixed(5) : "")
-    )
-  })
-  lines.push("")
-  lines.push("Généré par StructCalc — RPA 2024 DTR BC 2.48")
-
+// Robot-compatible format: two columns only — T and Sa/g, no headers, no extra text
+function exportTxtH(hData, zone, site) {
+  const lines = hData.pts.map(p =>
+    p.T.toFixed(2).padEnd(10) + p.Sa_g.toFixed(6)
+  )
   const blob = new Blob([lines.join("\n")], {type:"text/plain"})
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
-  a.download = `StructCalc_Spectre_Zone${zone}_${site}.txt`
+  a.download = `RPA24_Sad_Zone${zone}_${site}.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function exportTxtV(vData, zone, site) {
+  const lines = vData.pts.map(p =>
+    p.T.toFixed(2).padEnd(10) + p.Sa_g.toFixed(6)
+  )
+  const blob = new Blob([lines.join("\n")], {type:"text/plain"})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `RPA24_Svd_Zone${zone}_${site}.txt`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -406,41 +399,25 @@ function QFModal({onClose, onValidate, initCat, initChecked, c}) {
 // R MODAL
 // ─────────────────────────────────────────────────────────────────────────────
 
-function RModal({onClose, onValidate, initSystem, initR, c}) {
-  const [tab,      setTab]      = useState("manual")   // "manual" | "forces"
-  const [selSys,   setSelSys]   = useState(initSystem)
-  const [Voss,     setVoss]     = useState("")
-  const [Vvoi,     setVvoi]     = useState("")
-  const [Vtot,     setVtot]     = useState("")
-  const [detSys,   setDetSys]   = useState(null)
-  const [adjR,     setAdjR]     = useState(initR)
-  const robotStatus = "disconnected"
+function RModal({onClose, onValidate, initSystem, c}) {
+  const [tab,    setTab]    = useState("manual")
+  const [selSys, setSelSys] = useState(initSystem)
+  const [Voss,   setVoss]   = useState("")
+  const [Vvoi,   setVvoi]   = useState("")
+  const [Vtot,   setVtot]   = useState("")
+  const [detSys, setDetSys] = useState(null)
 
-  // Active system (from manual selection or detection)
+  // Active system — from manual selection or auto-detection
   const activeSys = tab==="manual"
     ? SYSTEMS.find(s=>s.id===selSys)
     : detSys
 
-  // When system changes, reset adjR to table value
-  function applySystem(sys) {
-    if (sys) setAdjR(sys.R)
-  }
-
-  function handleSelectSys(id) {
-    setSelSys(id)
-    applySystem(SYSTEMS.find(s=>s.id===id))
-  }
-
   function detectFromForces() {
-    const vo = parseFloat(Voss), vv = parseFloat(Vvoi), vt = parseFloat(Vtot)
+    const vo=parseFloat(Voss), vv=parseFloat(Vvoi), vt=parseFloat(Vtot)
     if (isNaN(vt)||vt<=0) return
-    const rOss = (isNaN(vo)?0:vo)/vt
-    const rVoi = (isNaN(vv)?0:vv)/vt
-    const ratio = {ossature:rOss, voiles:rVoi}
-    // Try systems in order: 1,2,4,5 (force-detectable)
+    const ratio = {ossature:(isNaN(vo)?0:vo)/vt, voiles:(isNaN(vv)?0:vv)/vt}
     const found = SYSTEMS.find(s=>s.detect && s.detect(ratio))
     setDetSys(found||null)
-    if (found) setAdjR(found.R)
   }
 
   return (
@@ -469,7 +446,7 @@ function RModal({onClose, onValidate, initSystem, initR, c}) {
         </div>
 
         {/* Mode tabs */}
-        <div style={{display:"flex",gap:7,marginBottom:18}}>
+        <div style={{display:"flex",gap:7,marginBottom:16}}>
           {[{id:"manual",l:"🏗️ Sélection manuelle"},
             {id:"forces",l:"📊 Par effort tranchant"}].map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} style={{
@@ -483,21 +460,7 @@ function RModal({onClose, onValidate, initSystem, initR, c}) {
           ))}
         </div>
 
-        {/* Robot import strip */}
-        <div style={{background:c.elevated,border:`1px solid ${c.border}`,
-          borderRadius:8,padding:"9px 13px",marginBottom:16,
-          display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:8,height:8,borderRadius:"50%",background:c.borderLight,flexShrink:0}}/>
-          <span style={{fontSize:12,color:c.textMuted,flex:1}}>
-            Robot non connecté — import automatique des efforts indisponible
-          </span>
-          <button style={{padding:"5px 11px",borderRadius:6,cursor:"not-allowed",
-            background:c.border,border:"none",color:c.textMuted,fontSize:11}}>
-            Connecter
-          </button>
-        </div>
-
-        {/* ── Tab: Manual selection ── */}
+        {/* ── Tab: Manual selection — no Robot strip here ── */}
         {tab==="manual" && (
           <div style={{marginBottom:16}}>
             <div style={{fontSize:11,color:c.textMuted,marginBottom:9,
@@ -505,10 +468,9 @@ function RModal({onClose, onValidate, initSystem, initR, c}) {
               Choisir le système de contreventement
             </div>
             {SYSTEMS.map(sys=>(
-              <div key={sys.id} onClick={()=>handleSelectSys(sys.id)}
+              <div key={sys.id} onClick={()=>setSelSys(sys.id)}
                 style={{display:"flex",alignItems:"flex-start",gap:11,
-                  padding:"10px 12px",borderRadius:8,cursor:"pointer",
-                  marginBottom:5,
+                  padding:"10px 12px",borderRadius:8,cursor:"pointer",marginBottom:5,
                   background:selSys===sys.id?c.blue+"15":c.elevated,
                   border:`1px solid ${selSys===sys.id?c.blue:c.border}`}}>
                 <div style={{width:20,height:20,borderRadius:"50%",flexShrink:0,
@@ -539,18 +501,33 @@ function RModal({onClose, onValidate, initSystem, initR, c}) {
           </div>
         )}
 
-        {/* ── Tab: Force entry ── */}
+        {/* ── Tab: Force entry — Robot strip here only ── */}
         {tab==="forces" && (
           <div style={{marginBottom:16}}>
+            {/* Robot strip — only in this tab */}
+            <div style={{background:c.elevated,border:`1px solid ${c.border}`,
+              borderRadius:8,padding:"9px 13px",marginBottom:14,
+              display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:8,height:8,borderRadius:"50%",
+                background:c.borderLight,flexShrink:0}}/>
+              <span style={{fontSize:12,color:c.textMuted,flex:1}}>
+                Robot non connecté — import automatique indisponible
+              </span>
+              <button style={{padding:"5px 11px",borderRadius:6,cursor:"not-allowed",
+                background:c.border,border:"none",color:c.textMuted,fontSize:11}}>
+                Connecter
+              </button>
+            </div>
+
             <div style={{fontSize:11,color:c.textMuted,marginBottom:10,
               textTransform:"uppercase",letterSpacing:"0.07em"}}>
               Saisir les efforts tranchants à la base
             </div>
             <div style={{display:"flex",gap:10,marginBottom:12}}>
               {[
-                {label:"V ossature (kN)", val:Voss, set:setVoss},
-                {label:"V voiles (kN)",   val:Vvoi, set:setVvoi},
-                {label:"V total (kN)",    val:Vtot, set:setVtot},
+                {label:"V ossature (kN)",val:Voss,set:setVoss},
+                {label:"V voiles (kN)",  val:Vvoi,set:setVvoi},
+                {label:"V total (kN)",   val:Vtot,set:setVtot},
               ].map(f=>(
                 <div key={f.label} style={{flex:1}}>
                   <div style={{fontSize:11,color:c.textMuted,marginBottom:4}}>{f.label}</div>
@@ -563,14 +540,13 @@ function RModal({onClose, onValidate, initSystem, initR, c}) {
               ))}
             </div>
 
-            {/* Ratios preview */}
             {Vtot && parseFloat(Vtot)>0 && (
               <div style={{background:c.elevated,borderRadius:8,padding:"10px 13px",
                 marginBottom:12,fontSize:12,color:c.textMuted}}>
-                {Voss && <div>V<sub>ossature</sub> / V<sub>base</sub> = <b style={{color:c.text,fontFamily:"monospace"}}>
+                {Voss&&<div>V<sub>ossature</sub>/V<sub>base</sub> = <b style={{color:c.text,fontFamily:"monospace"}}>
                   {((parseFloat(Voss)||0)/parseFloat(Vtot)*100).toFixed(1)}%
                 </b></div>}
-                {Vvoi && <div>V<sub>voiles</sub> / V<sub>base</sub> = <b style={{color:c.text,fontFamily:"monospace"}}>
+                {Vvoi&&<div>V<sub>voiles</sub>/V<sub>base</sub> = <b style={{color:c.text,fontFamily:"monospace"}}>
                   {((parseFloat(Vvoi)||0)/parseFloat(Vtot)*100).toFixed(1)}%
                 </b></div>}
               </div>
@@ -590,62 +566,45 @@ function RModal({onClose, onValidate, initSystem, initR, c}) {
                 <div style={{fontSize:14,fontWeight:700,color:c.text}}>{detSys.label}</div>
                 <div style={{fontSize:11,color:c.textMuted,marginTop:2}}>{detSys.desc}</div>
               </div>
-            ) : Voss||Vvoi||Vtot ? (
+            ) : (Voss||Vvoi||Vtot) ? (
               <div style={{background:c.amber+"11",border:`1px solid ${c.amber}44`,
                 borderRadius:8,padding:"10px 13px",fontSize:12,color:c.amber}}>
-                ⚠️ Système 3 ou 6 — nécessite une sélection manuelle (vérification terrain requise)
+                ⚠️ Système 3 ou 6 — sélection manuelle requise
               </div>
             ) : null}
           </div>
         )}
 
-        {/* R adjustment */}
+        {/* R summary — table value only, no adjustment */}
         {activeSys && (
-          <div style={{background:c.elevated,border:`1px solid ${c.border}`,
-            borderRadius:10,padding:"14px 16px",marginBottom:16}}>
-            <div style={{display:"flex",justifyContent:"space-between",
-              alignItems:"center",marginBottom:10}}>
-              <div>
-                <div style={{fontSize:11,color:c.textMuted,marginBottom:2}}>
-                  Valeur R — {activeSys.label}
-                </div>
-                <div style={{fontSize:11,color:c.textMuted}}>
-                  Valeur tabulaire : <b style={{color:c.amber}}>{activeSys.R}</b>
-                  &nbsp;·&nbsp;Cat. Q<sub>F</sub> : <b style={{color:activeSys.qfCat==="a"?c.blue:c.purple}}>({activeSys.qfCat})</b>
-                </div>
+          <div style={{background:c.elevated,border:`1px solid ${c.amber}44`,
+            borderRadius:10,padding:"14px 16px",marginBottom:16,
+            display:"flex",alignItems:"center",gap:16}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,color:c.textMuted,marginBottom:2}}>
+                Valeur R — {activeSys.label}
               </div>
-              <button onClick={()=>setAdjR(activeSys.R)} style={{
-                fontSize:11,padding:"4px 9px",borderRadius:6,cursor:"pointer",
-                background:"transparent",border:`1px solid ${c.border}`,color:c.textMuted}}>
-                Réinitialiser
-              </button>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <button onClick={()=>setAdjR(r=>Math.max(1.5,+(r-0.5).toFixed(1)))}
-                style={{width:36,height:36,borderRadius:8,cursor:"pointer",
-                  background:c.border,border:"none",color:c.text,fontSize:18,fontWeight:700}}>−</button>
-              <div style={{flex:1,textAlign:"center",fontSize:36,fontWeight:700,
-                fontFamily:"monospace",color:c.amber}}>{adjR}</div>
-              <button onClick={()=>setAdjR(r=>Math.min(7,+(r+0.5).toFixed(1)))}
-                style={{width:36,height:36,borderRadius:8,cursor:"pointer",
-                  background:c.border,border:"none",color:c.text,fontSize:18,fontWeight:700}}>+</button>
-            </div>
-            {adjR !== activeSys.R && (
-              <div style={{fontSize:11,color:c.amber,textAlign:"center",marginTop:6}}>
-                ⚠️ Valeur modifiée par l'ingénieur (tabulaire : {activeSys.R})
+              <div style={{fontSize:11,color:c.textMuted}}>
+                Cat. Q<sub>F</sub> :&nbsp;
+                <b style={{color:activeSys.qfCat==="a"?c.blue:c.purple}}>
+                  ({activeSys.qfCat})
+                </b>
               </div>
-            )}
+            </div>
+            <div style={{fontSize:42,fontWeight:700,fontFamily:"monospace",color:c.amber}}>
+              {activeSys.R}
+            </div>
           </div>
         )}
 
         <button
-          onClick={()=>onValidate(adjR, activeSys)}
+          onClick={()=>onValidate(activeSys?.R, activeSys)}
           disabled={!activeSys}
           style={{width:"100%",padding:"11px",borderRadius:8,
             cursor:activeSys?"pointer":"not-allowed",
             background:activeSys?c.blue:c.border,
             border:"none",color:"white",fontSize:14,fontWeight:700}}>
-          {activeSys ? `Valider R = ${adjR}` : "Sélectionner un système d'abord"}
+          {activeSys ? `Valider R = ${activeSys.R}` : "Sélectionner un système d'abord"}
         </button>
       </div>
     </div>
@@ -681,7 +640,7 @@ export default function SpectrumChart({ c, isDark }) {
         onClose={()=>setShowQ(false)}
         onValidate={(qf,cat,chk)=>{setQF(qf);setQfCat(cat);setQfChk(chk);setShowQ(false)}}/>}
 
-      {showR && <RModal c={c} initSystem={selSys} initR={R}
+      {showR && <RModal c={c} initSystem={selSys}
         onClose={()=>setShowR(false)}
         onValidate={(r,sys)=>{
           setR(r)
@@ -825,12 +784,20 @@ export default function SpectrumChart({ c, isDark }) {
                 🔌 Export → Robot
               </button>
               <button
-                onClick={()=>exportTxt(hData,vData,zone,site,group,QF,R)}
+                onClick={()=>exportTxtH(hData,zone,site)}
                 style={{padding:"8px 13px",borderRadius:8,cursor:"pointer",
-                  background:c.green+"22",border:`1px solid ${c.green}`,
-                  color:c.green,fontSize:12,fontWeight:600,
-                  display:"flex",alignItems:"center",gap:6}}>
-                📄 Export → .txt
+                  background:c.blue+"11",border:`1px solid ${c.blue}66`,
+                  color:c.blue,fontSize:12,fontWeight:600,
+                  display:"flex",alignItems:"center",gap:5}}>
+                📄 Sad → .txt
+              </button>
+              <button
+                onClick={()=>exportTxtV(vData,zone,site)}
+                style={{padding:"8px 13px",borderRadius:8,cursor:"pointer",
+                  background:c.purple+"11",border:`1px solid ${c.purple}66`,
+                  color:c.purple,fontSize:12,fontWeight:600,
+                  display:"flex",alignItems:"center",gap:5}}>
+                📄 Svd → .txt
               </button>
             </div>
           </div>
