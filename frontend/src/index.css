@@ -1,0 +1,55 @@
+/* StructCalc — Global Styles */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* Color palette */
+  --bg-base:      #020817;
+  --bg-surface:   #0a1628;
+  --bg-elevated:  #0f172a;
+  --border:       #1e293b;
+  --border-light: #334155;
+
+  --text-primary:   #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted:     #475569;
+
+  --accent-blue:   #3b82f6;
+  --accent-green:  #34d399;
+  --accent-amber:  #f59e0b;
+  --accent-red:    #f87171;
+  --accent-purple: #a78bfa;
+
+  /* Typography */
+  --font-sans: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Consolas', monospace;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100%;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Select reset */
+select {
+  font-family: var(--font-sans);
+}
