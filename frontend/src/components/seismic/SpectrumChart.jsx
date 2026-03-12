@@ -1,207 +1,365 @@
 /**
- * StructCalc — RPA 2024 Spectrum Visualizer (Session 3 — Full Update)
- * Implements Sad/g (Eq 3.15) + Svd/g (Eq 3.16)
+ * StructCalc — RPA 2024 Spectrum Visualizer (Session 4 — Full Update)
+ *
+ * Changes vs Session 3:
+ *   - Theme received as prop from App (sidebar now synced)
+ *   - Both H and V charts displayed side by side (no toggle)
+ *   - R modal: dual mode (manual system selection + force entry)
+ *   - Export to Robot (stub) + Export as .txt file (live)
+ *   - Theme toggle moved to sidebar footer
+ *
+ * Code references:
+ *   RPA 2024 §3.3.3 Eq.3.15 — horizontal design spectrum
+ *   RPA 2024 §3.3.3 Eq.3.16 — vertical design spectrum
+ *   RPA 2024 §3.5  Table 3.18 — structural systems + R values
+ *   RPA 2024 §3.8  Table 3.19 — quality factor QF
  */
+
 import { useState, useMemo } from "react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts"
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ReferenceLine, ResponsiveContainer,
+} from "recharts"
 
-const DARK = {
-  bg:"#020817",surface:"#0a1628",elevated:"#0f172a",border:"#1e293b",borderLight:"#334155",
-  text:"#f8fafc",textSec:"#94a3b8",textMuted:"#475569",chartGrid:"#1e293b",
-  blue:"#3b82f6",green:"#34d399",amber:"#f59e0b",red:"#f87171",purple:"#a78bfa",
-}
-const LIGHT = {
-  bg:"#f8fafc",surface:"#ffffff",elevated:"#f1f5f9",border:"#e2e8f0",borderLight:"#cbd5e1",
-  text:"#0f172a",textSec:"#475569",textMuted:"#94a3b8",chartGrid:"#e2e8f0",
-  blue:"#2563eb",green:"#059669",amber:"#d97706",red:"#dc2626",purple:"#7c3aed",
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// RPA 2024 DATA TABLES
+// ─────────────────────────────────────────────────────────────────────────────
 
-const ZONE_A = {"I":0.07,"II":0.10,"III":0.15,"IV":0.20,"V":0.25,"VI":0.30}
-const IMPORTANCE_I = {"1A":1.4,"1B":1.2,"2":1.0,"3":0.8}
+const ZONE_A = { "I":0.07,"II":0.10,"III":0.15,"IV":0.20,"V":0.25,"VI":0.30 }
+const IMPORTANCE_I = { "1A":1.4,"1B":1.2,"2":1.0,"3":0.8 }
+
 const HORIZ_TYPE1 = {
-  S1:{S:1.00,T1:0.10,T2:0.40,T3:2.0},S2:{S:1.20,T1:0.10,T2:0.50,T3:2.0},
-  S3:{S:1.30,T1:0.15,T2:0.60,T3:2.0},S4:{S:1.35,T1:0.15,T2:0.70,T3:2.0},
+  S1:{S:1.00,T1:0.10,T2:0.40,T3:2.0}, S2:{S:1.20,T1:0.10,T2:0.50,T3:2.0},
+  S3:{S:1.30,T1:0.15,T2:0.60,T3:2.0}, S4:{S:1.35,T1:0.15,T2:0.70,T3:2.0},
 }
 const HORIZ_TYPE2 = {
-  S1:{S:1.00,T1:0.05,T2:0.25,T3:1.2},S2:{S:1.30,T1:0.05,T2:0.30,T3:1.2},
-  S3:{S:1.55,T1:0.10,T2:0.40,T3:1.2},S4:{S:1.80,T1:0.10,T2:0.50,T3:1.2},
+  S1:{S:1.00,T1:0.05,T2:0.25,T3:1.2}, S2:{S:1.30,T1:0.05,T2:0.30,T3:1.2},
+  S3:{S:1.55,T1:0.10,T2:0.40,T3:1.2}, S4:{S:1.80,T1:0.10,T2:0.50,T3:1.2},
 }
 const VERT_TYPE1 = {
-  S1:{vRatio:0.90,T1:0.05,T2:0.20,T3:1.0,alpha:0.6},S2:{vRatio:0.90,T1:0.05,T2:0.30,T3:1.0,alpha:0.6},
-  S3:{vRatio:0.90,T1:0.05,T2:0.40,T3:1.0,alpha:0.6},S4:{vRatio:0.90,T1:0.05,T2:0.50,T3:1.0,alpha:0.6},
+  S1:{vR:0.90,T1:0.05,T2:0.20,T3:1.0,a:0.6}, S2:{vR:0.90,T1:0.05,T2:0.30,T3:1.0,a:0.6},
+  S3:{vR:0.90,T1:0.05,T2:0.40,T3:1.0,a:0.6}, S4:{vR:0.90,T1:0.05,T2:0.50,T3:1.0,a:0.6},
 }
 const VERT_TYPE2 = {
-  S1:{vRatio:0.55,T1:0.05,T2:0.15,T3:1.0,alpha:0.8},S2:{vRatio:0.55,T1:0.05,T2:0.20,T3:1.0,alpha:0.8},
-  S3:{vRatio:0.55,T1:0.05,T2:0.25,T3:1.0,alpha:0.8},S4:{vRatio:0.55,T1:0.05,T2:0.30,T3:1.0,alpha:0.8},
+  S1:{vR:0.55,T1:0.05,T2:0.15,T3:1.0,a:0.8}, S2:{vR:0.55,T1:0.05,T2:0.20,T3:1.0,a:0.8},
+  S3:{vR:0.55,T1:0.05,T2:0.25,T3:1.0,a:0.8}, S4:{vR:0.55,T1:0.05,T2:0.30,T3:1.0,a:0.8},
 }
 const TYPE1_ZONES = new Set(["IV","V","VI"])
 
+// RPA 2024 — Table 3.18 — Structural systems
+// auto: function(ratio) that detects system from force ratio
+const SYSTEMS = [
+  {
+    id:1, label:"Système 1 — Ossature",
+    desc:"Ossature (portiques). Résistance à l'effort tranchant à la base : Vossature > 65% Vbase",
+    R:5.5, qfCat:"a",
+    detect: r => r.ossature > 0.65,
+  },
+  {
+    id:2, label:"Système 2 — Mixte équivalent ossature",
+    desc:"Mixte. L'ossature reprend 50% à 65% de l'effort tranchant à la base.",
+    R:5.5, qfCat:"a",
+    detect: r => r.ossature >= 0.50 && r.ossature <= 0.65,
+  },
+  {
+    id:3, label:"Système 3 — Ossature avec remplissage rigide",
+    desc:"Ossature ou mixte avec remplissage en maçonnerie rigide (≤ 10 cm).",
+    R:3.5, qfCat:"a",
+    detect: null, // must be selected manually — requires field inspection
+  },
+  {
+    id:4, label:"Système 4 — Mixte équivalent voiles",
+    desc:"Les voiles reprennent 50% à 65% de l'effort tranchant à la base.",
+    R:4.5, qfCat:"b",
+    detect: r => r.voiles >= 0.50 && r.voiles <= 0.65,
+  },
+  {
+    id:5, label:"Système 5 — Voiles",
+    desc:"Contreventement constitué par des voiles. Vvoiles > 65% Vbase.",
+    R:4.5, qfCat:"b",
+    detect: r => r.voiles > 0.65,
+  },
+  {
+    id:6, label:"Système 6 — Noyau / Effet noyau",
+    desc:"Système à noyau ou à effet noyau. Rayons de torsion rx, ry ≤ rayon de giration ls.",
+    R:3.0, qfCat:"b",
+    detect: null, // torsion check — manual
+  },
+]
+
+// QF — Table 3.19
 const QF_CRITERIA = {
   a:[
-    {id:"a1",label:"Régularité en plan",pq:0.05},
-    {id:"a2",label:"Régularité en élévation",pq:0.20},
-    {id:"a3",label:"Conditions min. niveaux (≥2)",pq:0.20},
-    {id:"a4",label:"Conditions min. travées (≥3)",pq:0.10},
+    {id:"a1",label:"Régularité en plan",              pq:0.05},
+    {id:"a2",label:"Régularité en élévation",         pq:0.20},
+    {id:"a3",label:"Conditions min. niveaux (≥ 2)",   pq:0.20},
+    {id:"a4",label:"Conditions min. travées (≥ 3)",   pq:0.10},
   ],
   b:[
-    {id:"b1",label:"Régularité en plan",pq:0.05},
-    {id:"b2",label:"Régularité en élévation",pq:0.20},
-    {id:"b3",label:"Redondance en plan (≥2 files voiles)",pq:0.05},
+    {id:"b1",label:"Régularité en plan",              pq:0.05},
+    {id:"b2",label:"Régularité en élévation",         pq:0.20},
+    {id:"b3",label:"Redondance en plan (≥ 2 files)",  pq:0.05},
   ],
   c:[],
 }
-const QF_MAX = {a:1.35,b:1.30,c:1.0}
+const QF_MAX = {a:1.35, b:1.30, c:1.0}
 
-function computeSadH(T,A,I,S,QF,R,T1,T2,T3) {
-  const g=QF/R, base=A*I*S, floor=0.2*A*I
+// ─────────────────────────────────────────────────────────────────────────────
+// ENGINEERING FORMULAS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function sadH(T, A, I, S, QF, R, T1, T2, T3) {
+  const g = QF/R, base = A*I*S, floor = 0.2*A*I
   let v
-  if(T<T1)      v=base*(2/3+(T/T1)*(2.5*g-2/3))
-  else if(T<T2) v=base*2.5*g
-  else if(T<T3) v=base*2.5*g*(T2/T)
-  else          v=base*2.5*g*(T2*T3/Math.min(T,4)**2)
-  return Math.max(v,floor)
+  if      (T < T1) v = base*(2/3 + (T/T1)*(2.5*g - 2/3))
+  else if (T < T2) v = base*2.5*g
+  else if (T < T3) v = base*2.5*g*(T2/T)
+  else             v = base*2.5*g*(T2*T3/Math.min(T,4)**2)
+  return Math.max(v, floor)
 }
 
-function computeSvdV(T,Av,I,T1,T2,T3,alpha) {
-  const g=1/1.5, floor=0.2*Av*I
+function svdV(T, Av, I, T1, T2, T3, alpha) {
+  const g = 1/1.5, floor = 0.2*Av*I
   let v
-  if(T<T1)      v=Av*I*(2/3+(T/T1)*(2.5*g-2/3))
-  else if(T<T2) v=Av*I*2.5*g
-  else if(T<T3) v=Av*I*2.5*g*Math.pow(T2/T,alpha)
-  else          v=Av*I*2.5*g*Math.pow(T2*T3/Math.min(T,4)**2,alpha)
-  return Math.max(v,floor)
+  if      (T < T1) v = Av*I*(2/3 + (T/T1)*(2.5*g - 2/3))
+  else if (T < T2) v = Av*I*2.5*g
+  else if (T < T3) v = Av*I*2.5*g*Math.pow(T2/T, alpha)
+  else             v = Av*I*2.5*g*Math.pow(T2*T3/Math.min(T,4)**2, alpha)
+  return Math.max(v, floor)
 }
 
-function buildSpectrum(zone,site,group,QF,R,isVertical) {
+function buildH(zone, site, group, QF, R) {
   const A=ZONE_A[zone], I=IMPORTANCE_I[group], isT1=TYPE1_ZONES.has(zone)
-  if(!isVertical) {
-    const p=isT1?HORIZ_TYPE1[site]:HORIZ_TYPE2[site]
-    const {S,T1,T2,T3}=p
-    const pts=[]
-    for(let T=0;T<=4.001;T=Math.round((T+0.01)*1000)/1000)
-      pts.push({T:+T.toFixed(3),Sa_g:+computeSadH(T,A,I,S,QF,R,T1,T2,T3).toFixed(5),branch:T<T1?1:T<T2?2:T<T3?3:4})
-    return {A,I,S,QF,R,T1,T2,T3,Av:null,
-      spectrumType:isT1?"Type 1":"Type 2",
-      peakSa:+(A*I*S*2.5*(QF/R)).toFixed(4),
-      floor:+(0.2*A*I).toFixed(4),pts,
-      label:"Sad(T)/g",eq:"Éq. 3.15"}
-  } else {
-    const vp=isT1?VERT_TYPE1[site]:VERT_TYPE2[site]
-    const {vRatio,T1,T2,T3,alpha}=vp
-    const Av=+(vRatio*A).toFixed(4)
-    const pts=[]
-    for(let T=0;T<=4.001;T=Math.round((T+0.01)*1000)/1000)
-      pts.push({T:+T.toFixed(3),Sa_g:+computeSvdV(T,Av,I,T1,T2,T3,alpha).toFixed(5),branch:T<T1?1:T<T2?2:T<T3?3:4})
-    return {A,I,S:"1.0",QF:"1.0",R:"1.5",T1,T2,T3,Av,alpha,
-      spectrumType:isT1?"Type 1":"Type 2",
-      peakSa:+(Av*I*2.5/1.5).toFixed(4),
-      floor:+(0.2*Av*I).toFixed(4),pts,
-      label:"Svd(T)/g",eq:"Éq. 3.16"}
-  }
+  const p = isT1 ? HORIZ_TYPE1[site] : HORIZ_TYPE2[site]
+  const {S,T1,T2,T3} = p
+  const pts = []
+  for (let T=0; T<=4.001; T=Math.round((T+0.01)*1000)/1000)
+    pts.push({T:+T.toFixed(3), Sa_g:+sadH(T,A,I,S,QF,R,T1,T2,T3).toFixed(5)})
+  return {A,I,S,T1,T2,T3,isT1,
+    peak:+(A*I*S*2.5*(QF/R)).toFixed(4),
+    floor:+(0.2*A*I).toFixed(4), pts}
 }
 
-const BLABELS=["","Montée","Palier","Vitesse","Déplacement"]
-const BCOLORS=["","#60a5fa","#34d399","#f59e0b","#f87171"]
-
-function Tip({active,payload,c}){
-  if(!active||!payload?.length)return null
-  const d=payload[0].payload
-  return(
-    <div style={{background:c.elevated,border:`1px solid ${c.borderLight}`,borderRadius:8,padding:"10px 14px",fontSize:13}}>
-      <div style={{color:c.textMuted,marginBottom:3}}>T = <b style={{color:c.text}}>{d.T.toFixed(2)} s</b></div>
-      <div style={{color:c.textMuted}}>Sa/g = <b style={{color:c.green,fontSize:16}}>{d.Sa_g.toFixed(4)}</b></div>
-      <div style={{marginTop:4}}>
-        <span style={{background:BCOLORS[d.branch]+"22",color:BCOLORS[d.branch],borderRadius:4,padding:"2px 6px",fontSize:11}}>
-          Branche {d.branch} — {BLABELS[d.branch]}
-        </span>
-      </div>
-    </div>
-  )
+function buildV(zone, site, group) {
+  const A=ZONE_A[zone], I=IMPORTANCE_I[group], isT1=TYPE1_ZONES.has(zone)
+  const vp = isT1 ? VERT_TYPE1[site] : VERT_TYPE2[site]
+  const {vR,T1,T2,T3,a} = vp
+  const Av = +(vR*A).toFixed(4)
+  const pts = []
+  for (let T=0; T<=4.001; T=Math.round((T+0.01)*1000)/1000)
+    pts.push({T:+T.toFixed(3), Sa_g:+svdV(T,Av,I,T1,T2,T3,a).toFixed(5)})
+  return {Av,I,T1,T2,T3,alpha:a,isT1,
+    peak:+(Av*I*2.5/1.5).toFixed(4),
+    floor:+(0.2*Av*I).toFixed(4), pts}
 }
 
-function Sel({label,value,onChange,options,c}){
-  return(
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPORT HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function exportTxt(hData, vData, zone, site, group, QF, R) {
+  const lines = [
+    "StructCalc — RPA 2024 — Spectre de Réponse de Calcul",
+    "=".repeat(55),
+    `Zone sismique : ${zone}   Site : ${site}   Groupe : ${group}`,
+    `QF = ${QF.toFixed(2)}   R = ${R}`,
+    "",
+    "─── Spectre Horizontal Sad(T)/g — Éq. 3.15 ───",
+    `Palier max : ${hData.peak}   Plancher min : ${hData.floor}`,
+    `T1=${hData.T1}s  T2=${hData.T2}s  T3=${hData.T3}s`,
+    "",
+    "T (s)".padEnd(12) + "Sad/g".padEnd(14) + "Svd/g",
+    "-".repeat(38),
+  ]
+  hData.pts.forEach((h, i) => {
+    const v = vData.pts[i]
+    lines.push(
+      h.T.toFixed(3).padEnd(12) +
+      h.Sa_g.toFixed(5).padEnd(14) +
+      (v ? v.Sa_g.toFixed(5) : "")
+    )
+  })
+  lines.push("")
+  lines.push("Généré par StructCalc — RPA 2024 DTR BC 2.48")
+
+  const blob = new Blob([lines.join("\n")], {type:"text/plain"})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `StructCalc_Spectre_Zone${zone}_${site}.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REUSABLE COMPONENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Sel({label, value, onChange, options, c}) {
+  return (
     <div style={{display:"flex",flexDirection:"column",gap:5}}>
       <label style={{fontSize:11,letterSpacing:"0.08em",color:c.textMuted,textTransform:"uppercase"}}>{label}</label>
-      <select value={value} onChange={e=>onChange(e.target.value)}
-        style={{background:c.elevated,border:`1px solid ${c.border}`,color:c.text,borderRadius:8,padding:"8px 10px",fontSize:13,cursor:"pointer",outline:"none"}}>
+      <select value={value} onChange={e=>onChange(e.target.value)} style={{
+        background:c.elevated, border:`1px solid ${c.border}`,
+        color:c.text, borderRadius:8, padding:"8px 10px",
+        fontSize:13, cursor:"pointer", outline:"none",
+      }}>
         {options.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
       </select>
     </div>
   )
 }
 
-function Card({label,value,unit,accent,c}){
-  return(
-    <div style={{background:c.elevated,border:`1px solid ${accent}44`,borderRadius:10,padding:"12px 14px",flex:1,minWidth:88}}>
-      <div style={{fontSize:11,letterSpacing:"0.08em",color:c.textMuted,textTransform:"uppercase",marginBottom:5}}>{label}</div>
-      <div style={{fontSize:26,fontWeight:700,color:accent,fontFamily:"monospace",lineHeight:1.1}}>{value}</div>
+function Card({label, value, unit, accent, c}) {
+  return (
+    <div style={{background:c.elevated, border:`1px solid ${accent}44`,
+      borderRadius:10, padding:"12px 14px", flex:1, minWidth:84}}>
+      <div style={{fontSize:11,letterSpacing:"0.08em",color:c.textMuted,
+        textTransform:"uppercase",marginBottom:5}}>{label}</div>
+      <div style={{fontSize:24,fontWeight:700,color:accent,
+        fontFamily:"monospace",lineHeight:1.1}}>{value}</div>
       {unit&&<div style={{fontSize:11,color:c.textMuted,marginTop:3}}>{unit}</div>}
     </div>
   )
 }
 
-const DEFAULT_CHECKED = {a1:true,a2:true,a3:true,a4:true,b1:true,b2:true,b3:true}
+function ChartTooltip({active, payload, c}) {
+  if (!active||!payload?.length) return null
+  const d = payload[0].payload
+  return (
+    <div style={{background:c.elevated,border:`1px solid ${c.borderLight}`,
+      borderRadius:8,padding:"9px 13px",fontSize:13}}>
+      <div style={{color:c.textMuted,marginBottom:3}}>
+        T = <b style={{color:c.text}}>{d.T.toFixed(2)} s</b>
+      </div>
+      <div style={{color:c.textMuted}}>
+        Sa/g = <b style={{color:c.green,fontSize:15}}>{d.Sa_g.toFixed(4)}</b>
+      </div>
+    </div>
+  )
+}
 
-function QFModal({onClose,onValidate,initCat,initChecked,c}){
-  const [cat,setCat]=useState(initCat)
-  const [chk,setChk]=useState(initChecked)
-  const criteria=QF_CRITERIA[cat]
-  const qf=useMemo(()=>{
-    if(cat==="c")return 1.0
-    let t=1.0
-    criteria.forEach(cr=>{if(!chk[cr.id])t+=cr.pq})
-    return +Math.min(t,QF_MAX[cat]).toFixed(2)
-  },[cat,chk,criteria])
-  function changeCat(c2){
+function MiniChart({data, color, T1, T2, T3, floor, peak, label, eq, c}) {
+  return (
+    <div style={{background:c.surface, border:`1px solid ${c.border}`,
+      borderRadius:12, padding:"16px 12px 10px", flex:1, minWidth:280}}>
+      <div style={{fontSize:11,color:c.textMuted,marginBottom:10,display:"flex",
+        justifyContent:"space-between",alignItems:"center"}}>
+        <span>
+          <b style={{color,fontWeight:700}}>{label}</b>
+          &nbsp;·&nbsp;<span style={{color:c.blue}}>{eq}</span>
+        </span>
+        <span style={{fontFamily:"monospace",color:c.amber}}>min={floor}</span>
+      </div>
+      <ResponsiveContainer width="100%" height={240}>
+        <LineChart data={data} margin={{top:4,right:10,bottom:20,left:2}}>
+          <CartesianGrid stroke={c.border} strokeDasharray="4 4"/>
+          <XAxis dataKey="T" type="number" domain={[0,4]}
+            ticks={[0,0.5,1,1.5,2,2.5,3,3.5,4]}
+            tick={{fill:c.textMuted,fontSize:10}}
+            label={{value:"T (s)",position:"insideBottom",offset:-12,fill:c.textMuted,fontSize:10}}/>
+          <YAxis tick={{fill:c.textMuted,fontSize:10}}
+            label={{value:"Sa/g",angle:-90,position:"insideLeft",offset:13,fill:c.textMuted,fontSize:10}}/>
+          <Tooltip content={<ChartTooltip c={c}/>}/>
+          <ReferenceLine x={T1} stroke={c.borderLight} strokeDasharray="4 3"
+            label={{value:"T₁",fill:c.textMuted,fontSize:9,position:"top"}}/>
+          <ReferenceLine x={T2} stroke={c.borderLight} strokeDasharray="4 3"
+            label={{value:"T₂",fill:c.textMuted,fontSize:9,position:"top"}}/>
+          <ReferenceLine x={T3} stroke={c.borderLight} strokeDasharray="4 3"
+            label={{value:"T₃",fill:c.textMuted,fontSize:9,position:"top"}}/>
+          <ReferenceLine y={peak}  stroke={c.red+"44"}   strokeDasharray="3 3"/>
+          <ReferenceLine y={floor} stroke={c.amber+"44"} strokeDasharray="3 3"/>
+          <Line dataKey="Sa_g" dot={false} strokeWidth={2.5}
+            stroke={color} isAnimationActive animationDuration={300}/>
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QF MODAL
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DEF_CHECKED = {a1:true,a2:true,a3:true,a4:true,b1:true,b2:true,b3:true}
+
+function QFModal({onClose, onValidate, initCat, initChecked, c}) {
+  const [cat, setCat] = useState(initCat)
+  const [chk, setChk] = useState(initChecked)
+  const criteria = QF_CRITERIA[cat]
+
+  const qf = useMemo(() => {
+    if (cat==="c") return 1.0
+    let t = 1.0
+    criteria.forEach(cr => { if (!chk[cr.id]) t += cr.pq })
+    return +Math.min(t, QF_MAX[cat]).toFixed(2)
+  }, [cat, chk, criteria])
+
+  function changeCat(c2) {
     setCat(c2)
-    const r={}
-    QF_CRITERIA[c2].forEach(cr=>{r[cr.id]=true})
+    const r = {}
+    QF_CRITERIA[c2].forEach(cr => { r[cr.id]=true })
     setChk(r)
   }
-  return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.72)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{background:c.surface,border:`1px solid ${c.border}`,borderRadius:14,padding:28,width:460,maxWidth:"95vw",boxShadow:"0 24px 48px rgba(0,0,0,0.4)"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.72)",
+      zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{background:c.surface,border:`1px solid ${c.border}`,
+        borderRadius:14,padding:26,width:450,maxWidth:"95vw",
+        boxShadow:"0 24px 48px rgba(0,0,0,0.4)"}}>
+
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18}}>
           <div>
-            <div style={{fontSize:11,letterSpacing:"0.1em",color:c.blue,textTransform:"uppercase",marginBottom:4}}>RPA 2024 — §3.8 — Table 3.19</div>
-            <h2 style={{fontSize:18,fontWeight:700,color:c.text,margin:0}}>Facteur de Qualité Q<sub>F</sub></h2>
-            <div style={{fontSize:12,color:c.textMuted,marginTop:3}}>Q<sub>F</sub> = 1 + Σ P<sub>q</sub> (pénalités non satisfaits)</div>
+            <div style={{fontSize:11,letterSpacing:"0.1em",color:c.blue,
+              textTransform:"uppercase",marginBottom:3}}>RPA 2024 — §3.8 — Table 3.19</div>
+            <h2 style={{fontSize:17,fontWeight:700,color:c.text,margin:0}}>
+              Facteur de Qualité Q<sub>F</sub>
+            </h2>
+            <div style={{fontSize:12,color:c.textMuted,marginTop:2}}>
+              Q<sub>F</sub> = 1 + Σ P<sub>q</sub>
+            </div>
           </div>
-          <button onClick={onClose} style={{background:"none",border:"none",color:c.textMuted,fontSize:22,cursor:"pointer"}}>✕</button>
+          <button onClick={onClose} style={{background:"none",border:"none",
+            color:c.textMuted,fontSize:20,cursor:"pointer"}}>✕</button>
         </div>
 
-        <div style={{marginBottom:16}}>
-          <div style={{fontSize:11,color:c.textMuted,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.08em"}}>Catégorie de pondération</div>
-          <div style={{display:"flex",gap:8}}>
-            {[{id:"a",l:"(a) Ossatures",s:"Syst. 1,2,3"},{id:"b",l:"(b) Voiles",s:"Syst. 4,5,6"},{id:"c",l:"(c) Spécial",s:"QF = 1.0"}].map(ct=>(
-              <button key={ct.id} onClick={()=>changeCat(ct.id)}
-                style={{flex:1,padding:"8px 6px",borderRadius:8,cursor:"pointer",
-                  border:`1px solid ${cat===ct.id?c.blue:c.border}`,
-                  background:cat===ct.id?c.blue+"22":c.elevated,
-                  color:cat===ct.id?c.blue:c.textSec,
-                  fontSize:12,fontWeight:cat===ct.id?700:400,textAlign:"center"}}>
-                <div style={{fontWeight:600}}>{ct.l}</div>
-                <div style={{fontSize:10,opacity:0.7,marginTop:1}}>{ct.s}</div>
-              </button>
-            ))}
-          </div>
+        {/* Category tabs */}
+        <div style={{display:"flex",gap:7,marginBottom:14}}>
+          {[{id:"a",l:"(a) Ossatures",s:"Syst. 1,2,3"},
+            {id:"b",l:"(b) Voiles",s:"Syst. 4,5,6"},
+            {id:"c",l:"(c) Spécial",s:"QF = 1.0"}].map(ct=>(
+            <button key={ct.id} onClick={()=>changeCat(ct.id)} style={{
+              flex:1,padding:"7px 5px",borderRadius:8,cursor:"pointer",
+              border:`1px solid ${cat===ct.id?c.blue:c.border}`,
+              background:cat===ct.id?c.blue+"22":c.elevated,
+              color:cat===ct.id?c.blue:c.textSec,
+              fontSize:12,fontWeight:cat===ct.id?700:400,textAlign:"center"}}>
+              <div style={{fontWeight:600}}>{ct.l}</div>
+              <div style={{fontSize:10,opacity:0.7,marginTop:1}}>{ct.s}</div>
+            </button>
+          ))}
         </div>
 
         {cat==="c" ? (
-          <div style={{background:c.green+"11",border:`1px solid ${c.green}44`,borderRadius:8,padding:"14px",textAlign:"center",color:c.green,marginBottom:16,fontSize:14}}>
+          <div style={{background:c.green+"11",border:`1px solid ${c.green}44`,
+            borderRadius:8,padding:"12px",textAlign:"center",
+            color:c.green,marginBottom:14,fontSize:14}}>
             Aucune pénalité — <b>Q<sub>F</sub> = 1.0</b>
           </div>
         ) : (
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:11,color:c.textMuted,marginBottom:8,textTransform:"uppercase",letterSpacing:"0.08em"}}>
-              ✅ = Satisfait (pas de pénalité) &nbsp;|&nbsp; ❌ = Non satisfait (pénalité ajoutée)
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,color:c.textMuted,marginBottom:7,
+              textTransform:"uppercase",letterSpacing:"0.07em"}}>
+              ✅ Satisfait = pas de pénalité
             </div>
             {criteria.map(cr=>(
               <div key={cr.id} onClick={()=>setChk(p=>({...p,[cr.id]:!p[cr.id]}))}
-                style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:8,cursor:"pointer",
+                style={{display:"flex",alignItems:"center",gap:10,
+                  padding:"9px 11px",borderRadius:8,cursor:"pointer",
                   background:chk[cr.id]?c.green+"11":c.red+"11",
-                  border:`1px solid ${chk[cr.id]?c.green+"44":c.red+"44"}`,marginBottom:5}}>
+                  border:`1px solid ${chk[cr.id]?c.green+"44":c.red+"44"}`,
+                  marginBottom:5}}>
                 <div style={{width:20,height:20,borderRadius:5,flexShrink:0,
                   border:`2px solid ${chk[cr.id]?c.green:c.red}`,
                   background:chk[cr.id]?c.green:"transparent",
@@ -210,7 +368,8 @@ function QFModal({onClose,onValidate,initCat,initChecked,c}){
                   {chk[cr.id]?"✓":""}
                 </div>
                 <div style={{flex:1,fontSize:13,color:c.text}}>{cr.label}</div>
-                <div style={{fontSize:13,fontFamily:"monospace",color:chk[cr.id]?c.green:c.red,fontWeight:700}}>
+                <div style={{fontSize:13,fontFamily:"monospace",
+                  color:chk[cr.id]?c.green:c.red,fontWeight:700}}>
                   {chk[cr.id]?"+0.00":`+${cr.pq.toFixed(2)}`}
                 </div>
               </div>
@@ -218,20 +377,24 @@ function QFModal({onClose,onValidate,initCat,initChecked,c}){
           </div>
         )}
 
-        <div style={{background:c.elevated,borderRadius:10,padding:"12px 16px",marginBottom:18,display:"flex",alignItems:"center",gap:14}}>
+        <div style={{background:c.elevated,borderRadius:10,padding:"11px 14px",
+          marginBottom:16,display:"flex",alignItems:"center",gap:14}}>
           <div style={{flex:1}}>
             <div style={{fontSize:11,color:c.textMuted,marginBottom:2}}>Q<sub>F</sub> résultant</div>
-            <div style={{fontSize:34,fontWeight:700,fontFamily:"monospace",color:qf<=1.05?c.green:qf<=1.20?c.amber:c.red}}>
+            <div style={{fontSize:32,fontWeight:700,fontFamily:"monospace",
+              color:qf<=1.05?c.green:qf<=1.20?c.amber:c.red}}>
               {qf.toFixed(2)}
             </div>
-            <div style={{fontSize:11,color:c.textMuted,marginTop:2}}>Plage : 1.00 ≤ Q<sub>F</sub> ≤ {QF_MAX[cat]}</div>
+            <div style={{fontSize:11,color:c.textMuted,marginTop:1}}>
+              Plage : 1.00 ≤ Q<sub>F</sub> ≤ {QF_MAX[cat]}
+            </div>
           </div>
-          <div style={{fontSize:42}}>{qf<=1.05?"✅":qf<=1.20?"⚠️":"🔴"}</div>
+          <div style={{fontSize:40}}>{qf<=1.05?"✅":qf<=1.20?"⚠️":"🔴"}</div>
         </div>
 
-        <button onClick={()=>onValidate(qf,cat,chk)}
-          style={{width:"100%",padding:"12px",borderRadius:8,cursor:"pointer",
-            background:c.blue,border:"none",color:"white",fontSize:14,fontWeight:700}}>
+        <button onClick={()=>onValidate(qf,cat,chk)} style={{
+          width:"100%",padding:"11px",borderRadius:8,cursor:"pointer",
+          background:c.blue,border:"none",color:"white",fontSize:14,fontWeight:700}}>
           Valider Q<sub>F</sub> = {qf.toFixed(2)}
         </button>
       </div>
@@ -239,186 +402,439 @@ function QFModal({onClose,onValidate,initCat,initChecked,c}){
   )
 }
 
-export default function SpectrumChart(){
-  const [isDark,setIsDark]=useState(true)
-  const [isVert,setIsVert]=useState(false)
-  const [zone,setZone]=useState("VI")
-  const [site,setSite]=useState("S2")
-  const [group,setGroup]=useState("2")
-  const [QF,setQF]=useState(1.0)
-  const [R,setR]=useState(4.5)
-  const [qfCat,setQfCat]=useState("a")
-  const [qfChk,setQfChk]=useState(DEFAULT_CHECKED)
-  const [showQ,setShowQ]=useState(false)
-  const robotStatus="disconnected"
-  const c=isDark?DARK:LIGHT
+// ─────────────────────────────────────────────────────────────────────────────
+// R MODAL
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const res=useMemo(()=>buildSpectrum(zone,site,group,QF,R,isVert),[zone,site,group,QF,R,isVert])
-  const {T1,T2,T3,peakSa,floor,spectrumType,pts,label,eq}=res
+function RModal({onClose, onValidate, initSystem, initR, c}) {
+  const [tab,      setTab]      = useState("manual")   // "manual" | "forces"
+  const [selSys,   setSelSys]   = useState(initSystem)
+  const [Voss,     setVoss]     = useState("")
+  const [Vvoi,     setVvoi]     = useState("")
+  const [Vtot,     setVtot]     = useState("")
+  const [detSys,   setDetSys]   = useState(null)
+  const [adjR,     setAdjR]     = useState(initR)
+  const robotStatus = "disconnected"
 
-  return(
-    <div style={{background:c.bg,minHeight:"100vh",color:c.text,fontFamily:"'IBM Plex Sans','Segoe UI',sans-serif",padding:"24px 20px",transition:"background 0.2s,color 0.2s"}}>
+  // Active system (from manual selection or detection)
+  const activeSys = tab==="manual"
+    ? SYSTEMS.find(s=>s.id===selSys)
+    : detSys
 
-      {showQ&&<QFModal c={c} initCat={qfCat} initChecked={qfChk} onClose={()=>setShowQ(false)}
+  // When system changes, reset adjR to table value
+  function applySystem(sys) {
+    if (sys) setAdjR(sys.R)
+  }
+
+  function handleSelectSys(id) {
+    setSelSys(id)
+    applySystem(SYSTEMS.find(s=>s.id===id))
+  }
+
+  function detectFromForces() {
+    const vo = parseFloat(Voss), vv = parseFloat(Vvoi), vt = parseFloat(Vtot)
+    if (isNaN(vt)||vt<=0) return
+    const rOss = (isNaN(vo)?0:vo)/vt
+    const rVoi = (isNaN(vv)?0:vv)/vt
+    const ratio = {ossature:rOss, voiles:rVoi}
+    // Try systems in order: 1,2,4,5 (force-detectable)
+    const found = SYSTEMS.find(s=>s.detect && s.detect(ratio))
+    setDetSys(found||null)
+    if (found) setAdjR(found.R)
+  }
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.72)",
+      zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{background:c.surface,border:`1px solid ${c.border}`,
+        borderRadius:14,padding:26,width:520,maxWidth:"95vw",
+        maxHeight:"90vh",overflowY:"auto",
+        boxShadow:"0 24px 48px rgba(0,0,0,0.4)"}}>
+
+        {/* Header */}
+        <div style={{display:"flex",justifyContent:"space-between",
+          alignItems:"flex-start",marginBottom:18}}>
+          <div>
+            <div style={{fontSize:11,letterSpacing:"0.1em",color:c.blue,
+              textTransform:"uppercase",marginBottom:3}}>RPA 2024 — §3.5 — Table 3.18</div>
+            <h2 style={{fontSize:17,fontWeight:700,color:c.text,margin:0}}>
+              Coefficient de Comportement R
+            </h2>
+            <div style={{fontSize:12,color:c.textMuted,marginTop:2}}>
+              Identification du système de contreventement
+            </div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",
+            color:c.textMuted,fontSize:20,cursor:"pointer"}}>✕</button>
+        </div>
+
+        {/* Mode tabs */}
+        <div style={{display:"flex",gap:7,marginBottom:18}}>
+          {[{id:"manual",l:"🏗️ Sélection manuelle"},
+            {id:"forces",l:"📊 Par effort tranchant"}].map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{
+              flex:1,padding:"9px",borderRadius:8,cursor:"pointer",
+              border:`1px solid ${tab===t.id?c.blue:c.border}`,
+              background:tab===t.id?c.blue+"22":c.elevated,
+              color:tab===t.id?c.blue:c.textSec,
+              fontSize:13,fontWeight:tab===t.id?700:400}}>
+              {t.l}
+            </button>
+          ))}
+        </div>
+
+        {/* Robot import strip */}
+        <div style={{background:c.elevated,border:`1px solid ${c.border}`,
+          borderRadius:8,padding:"9px 13px",marginBottom:16,
+          display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:8,height:8,borderRadius:"50%",background:c.borderLight,flexShrink:0}}/>
+          <span style={{fontSize:12,color:c.textMuted,flex:1}}>
+            Robot non connecté — import automatique des efforts indisponible
+          </span>
+          <button style={{padding:"5px 11px",borderRadius:6,cursor:"not-allowed",
+            background:c.border,border:"none",color:c.textMuted,fontSize:11}}>
+            Connecter
+          </button>
+        </div>
+
+        {/* ── Tab: Manual selection ── */}
+        {tab==="manual" && (
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:11,color:c.textMuted,marginBottom:9,
+              textTransform:"uppercase",letterSpacing:"0.07em"}}>
+              Choisir le système de contreventement
+            </div>
+            {SYSTEMS.map(sys=>(
+              <div key={sys.id} onClick={()=>handleSelectSys(sys.id)}
+                style={{display:"flex",alignItems:"flex-start",gap:11,
+                  padding:"10px 12px",borderRadius:8,cursor:"pointer",
+                  marginBottom:5,
+                  background:selSys===sys.id?c.blue+"15":c.elevated,
+                  border:`1px solid ${selSys===sys.id?c.blue:c.border}`}}>
+                <div style={{width:20,height:20,borderRadius:"50%",flexShrink:0,
+                  border:`2px solid ${selSys===sys.id?c.blue:c.borderLight}`,
+                  background:selSys===sys.id?c.blue:"transparent",
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:11,color:"white",fontWeight:700,marginTop:1}}>
+                  {selSys===sys.id?"●":""}
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:600,color:c.text,marginBottom:2}}>
+                    {sys.label}
+                    <span style={{marginLeft:8,fontSize:11,
+                      color:sys.qfCat==="a"?c.blue:c.purple,
+                      background:(sys.qfCat==="a"?c.blue:c.purple)+"22",
+                      borderRadius:4,padding:"1px 5px"}}>
+                      Cat. ({sys.qfCat})
+                    </span>
+                  </div>
+                  <div style={{fontSize:11,color:c.textMuted,lineHeight:1.5}}>{sys.desc}</div>
+                </div>
+                <div style={{fontSize:18,fontWeight:700,color:c.amber,
+                  fontFamily:"monospace",flexShrink:0}}>
+                  R={sys.R}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Tab: Force entry ── */}
+        {tab==="forces" && (
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:11,color:c.textMuted,marginBottom:10,
+              textTransform:"uppercase",letterSpacing:"0.07em"}}>
+              Saisir les efforts tranchants à la base
+            </div>
+            <div style={{display:"flex",gap:10,marginBottom:12}}>
+              {[
+                {label:"V ossature (kN)", val:Voss, set:setVoss},
+                {label:"V voiles (kN)",   val:Vvoi, set:setVvoi},
+                {label:"V total (kN)",    val:Vtot, set:setVtot},
+              ].map(f=>(
+                <div key={f.label} style={{flex:1}}>
+                  <div style={{fontSize:11,color:c.textMuted,marginBottom:4}}>{f.label}</div>
+                  <input type="number" min={0} value={f.val}
+                    onChange={e=>f.set(e.target.value)}
+                    style={{width:"100%",background:c.elevated,border:`1px solid ${c.border}`,
+                      borderRadius:7,padding:"8px 10px",color:c.text,
+                      fontSize:15,fontFamily:"monospace",outline:"none"}}/>
+                </div>
+              ))}
+            </div>
+
+            {/* Ratios preview */}
+            {Vtot && parseFloat(Vtot)>0 && (
+              <div style={{background:c.elevated,borderRadius:8,padding:"10px 13px",
+                marginBottom:12,fontSize:12,color:c.textMuted}}>
+                {Voss && <div>V<sub>ossature</sub> / V<sub>base</sub> = <b style={{color:c.text,fontFamily:"monospace"}}>
+                  {((parseFloat(Voss)||0)/parseFloat(Vtot)*100).toFixed(1)}%
+                </b></div>}
+                {Vvoi && <div>V<sub>voiles</sub> / V<sub>base</sub> = <b style={{color:c.text,fontFamily:"monospace"}}>
+                  {((parseFloat(Vvoi)||0)/parseFloat(Vtot)*100).toFixed(1)}%
+                </b></div>}
+              </div>
+            )}
+
+            <button onClick={detectFromForces} style={{
+              width:"100%",padding:"9px",borderRadius:8,cursor:"pointer",
+              background:c.blue,border:"none",color:"white",
+              fontSize:13,fontWeight:700,marginBottom:10}}>
+              Détecter le système automatiquement
+            </button>
+
+            {detSys ? (
+              <div style={{background:c.green+"11",border:`1px solid ${c.green}44`,
+                borderRadius:8,padding:"11px 13px"}}>
+                <div style={{fontSize:12,color:c.green,marginBottom:3}}>✅ Système identifié</div>
+                <div style={{fontSize:14,fontWeight:700,color:c.text}}>{detSys.label}</div>
+                <div style={{fontSize:11,color:c.textMuted,marginTop:2}}>{detSys.desc}</div>
+              </div>
+            ) : Voss||Vvoi||Vtot ? (
+              <div style={{background:c.amber+"11",border:`1px solid ${c.amber}44`,
+                borderRadius:8,padding:"10px 13px",fontSize:12,color:c.amber}}>
+                ⚠️ Système 3 ou 6 — nécessite une sélection manuelle (vérification terrain requise)
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {/* R adjustment */}
+        {activeSys && (
+          <div style={{background:c.elevated,border:`1px solid ${c.border}`,
+            borderRadius:10,padding:"14px 16px",marginBottom:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",
+              alignItems:"center",marginBottom:10}}>
+              <div>
+                <div style={{fontSize:11,color:c.textMuted,marginBottom:2}}>
+                  Valeur R — {activeSys.label}
+                </div>
+                <div style={{fontSize:11,color:c.textMuted}}>
+                  Valeur tabulaire : <b style={{color:c.amber}}>{activeSys.R}</b>
+                  &nbsp;·&nbsp;Cat. Q<sub>F</sub> : <b style={{color:activeSys.qfCat==="a"?c.blue:c.purple}}>({activeSys.qfCat})</b>
+                </div>
+              </div>
+              <button onClick={()=>setAdjR(activeSys.R)} style={{
+                fontSize:11,padding:"4px 9px",borderRadius:6,cursor:"pointer",
+                background:"transparent",border:`1px solid ${c.border}`,color:c.textMuted}}>
+                Réinitialiser
+              </button>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <button onClick={()=>setAdjR(r=>Math.max(1.5,+(r-0.5).toFixed(1)))}
+                style={{width:36,height:36,borderRadius:8,cursor:"pointer",
+                  background:c.border,border:"none",color:c.text,fontSize:18,fontWeight:700}}>−</button>
+              <div style={{flex:1,textAlign:"center",fontSize:36,fontWeight:700,
+                fontFamily:"monospace",color:c.amber}}>{adjR}</div>
+              <button onClick={()=>setAdjR(r=>Math.min(7,+(r+0.5).toFixed(1)))}
+                style={{width:36,height:36,borderRadius:8,cursor:"pointer",
+                  background:c.border,border:"none",color:c.text,fontSize:18,fontWeight:700}}>+</button>
+            </div>
+            {adjR !== activeSys.R && (
+              <div style={{fontSize:11,color:c.amber,textAlign:"center",marginTop:6}}>
+                ⚠️ Valeur modifiée par l'ingénieur (tabulaire : {activeSys.R})
+              </div>
+            )}
+          </div>
+        )}
+
+        <button
+          onClick={()=>onValidate(adjR, activeSys)}
+          disabled={!activeSys}
+          style={{width:"100%",padding:"11px",borderRadius:8,
+            cursor:activeSys?"pointer":"not-allowed",
+            background:activeSys?c.blue:c.border,
+            border:"none",color:"white",fontSize:14,fontWeight:700}}>
+          {activeSys ? `Valider R = ${adjR}` : "Sélectionner un système d'abord"}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function SpectrumChart({ c, isDark }) {
+  const [zone,     setZone]    = useState("VI")
+  const [site,     setSite]    = useState("S2")
+  const [group,    setGroup]   = useState("2")
+  const [QF,       setQF]      = useState(1.0)
+  const [R,        setR]       = useState(4.5)
+  const [selSys,   setSelSys]  = useState(1)
+  const [qfCat,    setQfCat]   = useState("a")
+  const [qfChk,    setQfChk]   = useState(DEF_CHECKED)
+  const [showQ,    setShowQ]   = useState(false)
+  const [showR,    setShowR]   = useState(false)
+
+  const hData = useMemo(()=>buildH(zone,site,group,QF,R),  [zone,site,group,QF,R])
+  const vData = useMemo(()=>buildV(zone,site,group),        [zone,site,group])
+  const isT1  = TYPE1_ZONES.has(zone)
+
+  return (
+    <div style={{background:c.bg,minHeight:"100vh",color:c.text,
+      fontFamily:"'IBM Plex Sans','Segoe UI',sans-serif",
+      padding:"22px 20px",transition:"background 0.2s,color 0.2s"}}>
+
+      {showQ && <QFModal c={c} initCat={qfCat} initChecked={qfChk}
+        onClose={()=>setShowQ(false)}
         onValidate={(qf,cat,chk)=>{setQF(qf);setQfCat(cat);setQfChk(chk);setShowQ(false)}}/>}
 
+      {showR && <RModal c={c} initSystem={selSys} initR={R}
+        onClose={()=>setShowR(false)}
+        onValidate={(r,sys)=>{
+          setR(r)
+          if(sys){setSelSys(sys.id); setQfCat(sys.qfCat)}
+          setShowR(false)
+        }}/>}
+
       {/* Header */}
-      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:22,flexWrap:"wrap",gap:12}}>
-        <div>
-          <div style={{fontSize:11,letterSpacing:"0.15em",color:c.blue,textTransform:"uppercase",marginBottom:5}}>RPA 2024 — DTR BC 2.48 — §3.3.3</div>
-          <h1 style={{fontSize:23,fontWeight:700,margin:0,color:c.text}}>Spectre de Réponse de Calcul</h1>
-          <div style={{color:c.textMuted,fontSize:12,marginTop:3}}>
-            {isVert?"Composante verticale Svd(T)/g — Éq. 3.16":"Composante horizontale Sad(T)/g — Éq. 3.15"}
-          </div>
+      <div style={{marginBottom:20}}>
+        <div style={{fontSize:11,letterSpacing:"0.15em",color:c.blue,
+          textTransform:"uppercase",marginBottom:5}}>
+          RPA 2024 — DTR BC 2.48 — §3.3.3
         </div>
-        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-          {/* H/V toggle */}
-          <div style={{display:"flex",alignItems:"center",gap:8,background:c.elevated,border:`1px solid ${c.border}`,borderRadius:8,padding:"6px 12px"}}>
-            <span style={{fontSize:12,color:isVert?c.textMuted:c.blue,fontWeight:700}}>H</span>
-            <div onClick={()=>setIsVert(v=>!v)}
-              style={{width:38,height:20,borderRadius:10,cursor:"pointer",background:isVert?c.purple:c.blue,position:"relative",transition:"background 0.2s"}}>
-              <div style={{position:"absolute",top:3,left:isVert?18:3,width:14,height:14,borderRadius:"50%",background:"white",transition:"left 0.2s"}}/>
-            </div>
-            <span style={{fontSize:12,color:isVert?c.purple:c.textMuted,fontWeight:700}}>V</span>
-          </div>
-          {/* Theme toggle */}
-          <button onClick={()=>setIsDark(d=>!d)} style={{padding:"7px 14px",borderRadius:8,cursor:"pointer",background:c.elevated,border:`1px solid ${c.border}`,color:c.textSec,fontSize:13,display:"flex",alignItems:"center",gap:6}}>
-            {isDark?"☀️ Clair":"🌙 Sombre"}
-          </button>
+        <h1 style={{fontSize:22,fontWeight:700,margin:0,color:c.text}}>
+          Spectre de Réponse de Calcul
+        </h1>
+        <div style={{color:c.textMuted,fontSize:12,marginTop:3}}>
+          Composantes horizontale (Éq. 3.15) et verticale (Éq. 3.16)
         </div>
       </div>
 
-      <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
-        {/* Input panel */}
-        <div style={{background:c.surface,border:`1px solid ${c.border}`,borderRadius:14,padding:20,width:210,flexShrink:0,display:"flex",flexDirection:"column",gap:14}}>
-          <div style={{fontSize:11,letterSpacing:"0.1em",color:c.blue,textTransform:"uppercase"}}>Paramètres</div>
+      <div style={{display:"flex",gap:18,flexWrap:"wrap"}}>
+
+        {/* ── Input panel ── */}
+        <div style={{background:c.surface,border:`1px solid ${c.border}`,
+          borderRadius:14,padding:18,width:200,flexShrink:0,
+          display:"flex",flexDirection:"column",gap:13}}>
+
+          <div style={{fontSize:11,letterSpacing:"0.1em",
+            color:c.blue,textTransform:"uppercase"}}>Paramètres</div>
+
           <Sel label="Zone sismique" value={zone} onChange={setZone} c={c} options={[
-            {v:"I",l:"Zone I — Faible"},{v:"II",l:"Zone II"},{v:"III",l:"Zone III — Moyenne"},
-            {v:"IV",l:"Zone IV"},{v:"V",l:"Zone V — Élevée"},{v:"VI",l:"Zone VI — Élevée"},
+            {v:"I",l:"Zone I — Faible"},{v:"II",l:"Zone II"},
+            {v:"III",l:"Zone III — Moyenne"},{v:"IV",l:"Zone IV"},
+            {v:"V",l:"Zone V — Élevée"},{v:"VI",l:"Zone VI — Élevée"},
           ]}/>
           <Sel label="Classe de site" value={site} onChange={setSite} c={c} options={[
-            {v:"S1",l:"S1 — Rocher"},{v:"S2",l:"S2 — Ferme"},{v:"S3",l:"S3 — Meuble"},{v:"S4",l:"S4 — Très meuble"},
+            {v:"S1",l:"S1 — Rocher"},{v:"S2",l:"S2 — Ferme"},
+            {v:"S3",l:"S3 — Meuble"},{v:"S4",l:"S4 — Très meuble"},
           ]}/>
           <Sel label="Groupe d'importance" value={group} onChange={setGroup} c={c} options={[
-            {v:"1A",l:"Groupe 1A — I=1.4"},{v:"1B",l:"Groupe 1B — I=1.2"},{v:"2",l:"Groupe 2 — I=1.0"},{v:"3",l:"Groupe 3 — I=0.8"},
+            {v:"1A",l:"Groupe 1A — I=1.4"},{v:"1B",l:"Groupe 1B — I=1.2"},
+            {v:"2",l:"Groupe 2 — I=1.0"},{v:"3",l:"Groupe 3 — I=0.8"},
           ]}/>
 
-          {!isVert&&<>
-            {/* QF button */}
-            <div>
-              <div style={{fontSize:11,letterSpacing:"0.08em",color:c.textMuted,textTransform:"uppercase",marginBottom:5}}>Facteur de qualité Q<sub>F</sub></div>
-              <button onClick={()=>setShowQ(true)} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 12px",borderRadius:8,cursor:"pointer",background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:13}}>
-                <span>Q<sub>F</sub> = <b style={{color:c.amber}}>{QF.toFixed(2)}</b></span>
-                <span style={{fontSize:11,color:c.blue}}>Calculer →</span>
-              </button>
-            </div>
-            {/* R from Robot */}
-            <div>
-              <div style={{fontSize:11,letterSpacing:"0.08em",color:c.textMuted,textTransform:"uppercase",marginBottom:5}}>Coeff. comportement R</div>
-              <div style={{background:c.elevated,border:`1px solid ${c.border}`,borderRadius:8,overflow:"hidden"}}>
-                <div style={{padding:"6px 10px",fontSize:11,borderBottom:`1px solid ${c.border}`,display:"flex",alignItems:"center",gap:6,color:c.textMuted}}>
-                  <div style={{width:7,height:7,borderRadius:"50%",background:c.borderLight}}/>
-                  Robot non connecté
-                </div>
-                <input type="number" min={1} max={6} step={0.5} value={R}
-                  onChange={e=>setR(+e.target.value)}
-                  style={{width:"100%",background:"transparent",border:"none",color:c.text,fontSize:24,fontWeight:700,fontFamily:"monospace",outline:"none",padding:"6px 10px"}}/>
-              </div>
-            </div>
-          </>}
+          {/* QF button */}
+          <div>
+            <div style={{fontSize:11,letterSpacing:"0.08em",color:c.textMuted,
+              textTransform:"uppercase",marginBottom:5}}>Facteur qualité Q<sub>F</sub></div>
+            <button onClick={()=>setShowQ(true)} style={{
+              width:"100%",display:"flex",alignItems:"center",
+              justifyContent:"space-between",padding:"9px 11px",borderRadius:8,
+              cursor:"pointer",background:c.elevated,
+              border:`1px solid ${c.border}`,color:c.text,fontSize:13}}>
+              <span>Q<sub>F</sub> = <b style={{color:c.amber}}>{QF.toFixed(2)}</b></span>
+              <span style={{fontSize:11,color:c.blue}}>Calculer →</span>
+            </button>
+          </div>
 
-          {isVert&&(
-            <div style={{background:c.purple+"11",border:`1px solid ${c.purple}44`,borderRadius:8,padding:"10px 12px",fontSize:12,color:c.textSec,lineHeight:1.8}}>
-              Spectre vertical :<br/>
-              <b style={{color:c.purple}}>R = 1.5</b> (fixe)<br/>
-              <b style={{color:c.purple}}>S = 1.0</b> (fixe)<br/>
-              <b style={{color:c.purple}}>QF = 1.0</b> (fixe)
+          {/* R button */}
+          <div>
+            <div style={{fontSize:11,letterSpacing:"0.08em",color:c.textMuted,
+              textTransform:"uppercase",marginBottom:5}}>Coeff. comportement R</div>
+            <button onClick={()=>setShowR(true)} style={{
+              width:"100%",display:"flex",alignItems:"center",
+              justifyContent:"space-between",padding:"9px 11px",borderRadius:8,
+              cursor:"pointer",background:c.elevated,
+              border:`1px solid ${c.border}`,color:c.text,fontSize:13}}>
+              <span>R = <b style={{color:c.red}}>{R}</b></span>
+              <span style={{fontSize:11,color:c.blue}}>Identifier →</span>
+            </button>
+            <div style={{fontSize:10,color:c.textMuted,marginTop:4,paddingLeft:2}}>
+              Syst. {selSys} · Cat. Q<sub>F</sub> ({qfCat})
             </div>
-          )}
+          </div>
 
-          <div style={{background:TYPE1_ZONES.has(zone)?c.blue+"22":c.green+"22",border:`1px solid ${TYPE1_ZONES.has(zone)?c.blue:c.green}`,borderRadius:8,padding:"8px 12px",textAlign:"center"}}>
+          {/* Spectrum type badge */}
+          <div style={{background:isT1?c.blue+"22":c.green+"22",
+            border:`1px solid ${isT1?c.blue:c.green}`,
+            borderRadius:8,padding:"8px 11px",textAlign:"center"}}>
             <div style={{fontSize:10,color:c.textMuted,marginBottom:2}}>Type de spectre</div>
-            <div style={{fontSize:15,fontWeight:700,color:TYPE1_ZONES.has(zone)?c.blue:c.green}}>{spectrumType}</div>
+            <div style={{fontSize:14,fontWeight:700,color:isT1?c.blue:c.green}}>
+              {isT1?"Type 1":"Type 2"}
+            </div>
           </div>
         </div>
 
-        {/* Right panel */}
-        <div style={{flex:1,minWidth:280,display:"flex",flexDirection:"column",gap:14}}>
+        {/* ── Right panel ── */}
+        <div style={{flex:1,minWidth:300,display:"flex",flexDirection:"column",gap:14}}>
 
-          {/* Param cards — large and readable */}
+          {/* Param cards */}
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            <Card label="A"        value={res.A}          unit="zone"         accent={c.amber}    c={c}/>
-            <Card label="I"        value={res.I}          unit="importance"   accent={c.purple}   c={c}/>
-            <Card label="S"        value={res.S}          unit="site"         accent={c.green}    c={c}/>
-            {!isVert&&<>
-              <Card label="QF"     value={QF.toFixed(2)}  unit="qualité"      accent={c.amber}    c={c}/>
-              <Card label="R"      value={R}              unit="comportement" accent={c.red}      c={c}/>
-            </>}
-            {isVert&&<>
-              <Card label="Av"     value={res.Av}         unit="vertical"     accent={c.purple}   c={c}/>
-              <Card label="α"      value={res.alpha}      unit="exposant"     accent={c.purple}   c={c}/>
-            </>}
-            <Card label="T₁"       value={T1}             unit="sec"          accent={c.textMuted} c={c}/>
-            <Card label="T₂"       value={T2}             unit="sec"          accent={c.textMuted} c={c}/>
-            <Card label="T₃"       value={T3}             unit="sec"          accent={c.textMuted} c={c}/>
-            <Card label="Sa max"   value={peakSa}         unit="palier"       accent={c.red}      c={c}/>
+            <Card label="A"    value={hData.A}       unit="zone"         accent={c.amber}    c={c}/>
+            <Card label="I"    value={hData.I}       unit="importance"   accent={c.purple}   c={c}/>
+            <Card label="S"    value={hData.S}       unit="site"         accent={c.green}    c={c}/>
+            <Card label="QF"   value={QF.toFixed(2)} unit="qualité"      accent={c.amber}    c={c}/>
+            <Card label="R"    value={R}             unit="comportement" accent={c.red}      c={c}/>
+            <Card label="T₁"   value={hData.T1}      unit="sec"          accent={c.textMuted} c={c}/>
+            <Card label="T₂"   value={hData.T2}      unit="sec"          accent={c.textMuted} c={c}/>
+            <Card label="T₃"   value={hData.T3}      unit="sec"          accent={c.textMuted} c={c}/>
           </div>
 
-          {/* Chart */}
-          <div style={{background:c.surface,border:`1px solid ${c.border}`,borderRadius:14,padding:"18px 14px 12px"}}>
-            <div style={{fontSize:11,color:c.textMuted,marginBottom:12}}>
-              <span style={{color:c.blue,fontWeight:600}}>{label}</span>
-              &nbsp;·&nbsp;{eq} — RPA 2024
-              &nbsp;·&nbsp;Plancher min :&nbsp;
-              <span style={{color:c.amber,fontFamily:"monospace"}}>{floor}</span>
+          {/* Both charts side by side */}
+          <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+            <MiniChart
+              data={hData.pts} color={c.blue}
+              T1={hData.T1} T2={hData.T2} T3={hData.T3}
+              floor={hData.floor} peak={hData.peak}
+              label="Sad(T)/g" eq="Éq. 3.15" c={c}/>
+            <MiniChart
+              data={vData.pts} color={c.purple}
+              T1={vData.T1} T2={vData.T2} T3={vData.T3}
+              floor={vData.floor} peak={vData.peak}
+              label="Svd(T)/g" eq="Éq. 3.16" c={c}/>
+          </div>
+
+          {/* Formula + Export bar */}
+          <div style={{background:c.surface,border:`1px solid ${c.border}`,
+            borderRadius:10,padding:"11px 14px",
+            display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+
+            {/* Formula */}
+            <div style={{flex:1,fontSize:12,color:c.textMuted,fontFamily:"monospace",
+              minWidth:240}}>
+              <span style={{color:c.blue,fontWeight:700}}>Éq.3.15</span>
+              {"  "}Sad(palier)={hData.A}·{hData.I}·{hData.S}·2.5·({QF.toFixed(2)}/{R})={" "}
+              <span style={{color:c.red,fontWeight:700}}>{hData.peak}</span>
+              {"  "}
+              <span style={{color:c.purple,fontWeight:700,marginLeft:10}}>Éq.3.16</span>
+              {"  "}Svd(palier)=<span style={{color:c.purple,fontWeight:700}}>{vData.peak}</span>
             </div>
-            <div style={{maxWidth:520}}>
-              <ResponsiveContainer width="100%" height={290}>
-                <LineChart data={pts} margin={{top:4,right:14,bottom:22,left:4}}>
-                  <CartesianGrid stroke={c.chartGrid} strokeDasharray="4 4"/>
-                  <XAxis dataKey="T" type="number" domain={[0,4]}
-                    ticks={[0,0.5,1,1.5,2,2.5,3,3.5,4]}
-                    tick={{fill:c.textMuted,fontSize:11}}
-                    label={{value:"Période T (s)",position:"insideBottom",offset:-12,fill:c.textMuted,fontSize:11}}/>
-                  <YAxis tick={{fill:c.textMuted,fontSize:11}}
-                    label={{value:"Sa/g",angle:-90,position:"insideLeft",offset:14,fill:c.textMuted,fontSize:11}}/>
-                  <Tooltip content={<Tip c={c}/>}/>
-                  <ReferenceLine x={T1} stroke={c.borderLight} strokeDasharray="5 3"
-                    label={{value:"T₁",fill:c.textMuted,fontSize:10,position:"top"}}/>
-                  <ReferenceLine x={T2} stroke={c.borderLight} strokeDasharray="5 3"
-                    label={{value:"T₂",fill:c.textMuted,fontSize:10,position:"top"}}/>
-                  <ReferenceLine x={T3} stroke={c.borderLight} strokeDasharray="5 3"
-                    label={{value:"T₃",fill:c.textMuted,fontSize:10,position:"top"}}/>
-                  <ReferenceLine y={peakSa} stroke={c.red+"44"} strokeDasharray="4 4"/>
-                  <ReferenceLine y={floor}  stroke={c.amber+"44"} strokeDasharray="3 3"/>
-                  <Line dataKey="Sa_g" dot={false} strokeWidth={2.5}
-                    stroke={isVert?c.purple:c.blue}
-                    isAnimationActive animationDuration={300}/>
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:8}}>
-              {[1,2,3,4].map(b=>(
-                <div key={b} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:c.textMuted}}>
-                  <div style={{width:20,height:3,borderRadius:2,background:BCOLORS[b]}}/>
-                  {BLABELS[b]}
-                </div>
-              ))}
-              <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:c.amber}}>
-                <div style={{width:20,height:2,borderRadius:2,borderTop:`2px dashed ${c.amber}`}}/>
-                Plancher min.
-              </div>
+
+            {/* Export buttons */}
+            <div style={{display:"flex",gap:8,flexShrink:0}}>
+              <button
+                onClick={()=>alert("Export vers Robot — disponible après connexion bridge (Session 6)")}
+                style={{padding:"8px 13px",borderRadius:8,cursor:"pointer",
+                  background:c.blue+"22",border:`1px solid ${c.blue}`,
+                  color:c.blue,fontSize:12,fontWeight:600,
+                  display:"flex",alignItems:"center",gap:6}}>
+                🔌 Export → Robot
+              </button>
+              <button
+                onClick={()=>exportTxt(hData,vData,zone,site,group,QF,R)}
+                style={{padding:"8px 13px",borderRadius:8,cursor:"pointer",
+                  background:c.green+"22",border:`1px solid ${c.green}`,
+                  color:c.green,fontSize:12,fontWeight:600,
+                  display:"flex",alignItems:"center",gap:6}}>
+                📄 Export → .txt
+              </button>
             </div>
           </div>
 
-          {/* Formula bar */}
-          <div style={{background:c.surface,border:`1px solid ${c.border}`,borderRadius:10,padding:"11px 14px",fontSize:12,color:c.textMuted,lineHeight:1.9}}>
-            <span style={{color:c.blue,fontWeight:700}}>{eq} — RPA 2024</span>{"  "}
-            {!isVert
-              ?<span style={{fontFamily:"monospace"}}>Sad(palier) = A·I·S·2.5·(QF/R) = {res.A}·{res.I}·{res.S}·2.5·({QF.toFixed(2)}/{R}) = <span style={{color:c.red,fontWeight:700}}>{peakSa}</span></span>
-              :<span style={{fontFamily:"monospace"}}>Svd(palier) = Av·I·(2.5/1.5) = {res.Av}·{res.I}·1.667 = <span style={{color:c.purple,fontWeight:700}}>{peakSa}</span></span>
-            }
-          </div>
         </div>
       </div>
     </div>

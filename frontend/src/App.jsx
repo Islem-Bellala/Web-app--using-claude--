@@ -1,153 +1,112 @@
 /**
  * StructCalc — Main Application
- * ================================
- * Root component with sidebar navigation.
- * Each page is a separate module — easy to add new ones.
- *
- * Current pages:
- *   - Spectre RPA 2024  ← Session 2
- *
- * Coming soon:
- *   - Effort tranchant V
- *   - Combinaisons sismiques
- *   - Ferraillage CBA93
- *   - Dashboard de vérification
+ * Theme state lives here so sidebar + all pages share the same mode.
  */
 
 import { useState } from 'react'
 import SpectrumChart from './components/seismic/SpectrumChart.jsx'
 
-// ─── Navigation items ────────────────────────────────────────────────────────
+const DARK = {
+  bg:'#020817', surface:'#0a1628', elevated:'#0f172a',
+  border:'#1e293b', borderLight:'#334155',
+  text:'#f8fafc', textSec:'#94a3b8', textMuted:'#475569',
+  blue:'#3b82f6', green:'#34d399', amber:'#f59e0b',
+  red:'#f87171', purple:'#a78bfa',
+}
+const LIGHT = {
+  bg:'#f8fafc', surface:'#ffffff', elevated:'#f1f5f9',
+  border:'#e2e8f0', borderLight:'#cbd5e1',
+  text:'#0f172a', textSec:'#475569', textMuted:'#94a3b8',
+  blue:'#2563eb', green:'#059669', amber:'#d97706',
+  red:'#dc2626', purple:'#7c3aed',
+}
 
-const NAV_ITEMS = [
+const NAV = [
   {
     section: 'Sismique — RPA 2024',
     items: [
-      { id: 'spectrum',     label: 'Spectre de réponse',   icon: '📈', ready: true },
-      { id: 'base_shear',   label: 'Effort tranchant V',   icon: '⚡', ready: false },
-      { id: 'combinations', label: 'Combinaisons',         icon: '🔗', ready: false },
+      { id:'spectrum',     label:'Spectre de réponse', icon:'📈', ready:true  },
+      { id:'base_shear',   label:'Effort tranchant V', icon:'⚡', ready:false },
+      { id:'combinations', label:'Combinaisons',        icon:'🔗', ready:false },
     ]
   },
   {
     section: 'Ferraillage BA',
     items: [
-      { id: 'beams',   label: 'Poutres — CBA93',   icon: '🏗️', ready: false },
-      { id: 'columns', label: 'Poteaux — CBA93',   icon: '🏛️', ready: false },
-      { id: 'walls',   label: 'Voiles — CBA93',    icon: '🧱', ready: false },
+      { id:'beams',   label:'Poutres — CBA93',  icon:'🏗️', ready:false },
+      { id:'columns', label:'Poteaux — CBA93',  icon:'🏛️', ready:false },
+      { id:'walls',   label:'Voiles — CBA93',   icon:'🧱', ready:false },
     ]
   },
   {
     section: 'Connexion',
     items: [
-      { id: 'robot', label: 'Robot Structural', icon: '🔌', ready: false },
-      { id: 'etabs', label: 'ETABS',            icon: '🔌', ready: false },
+      { id:'robot', label:'Robot Structural', icon:'🔌', ready:false },
+      { id:'etabs', label:'ETABS',            icon:'🔌', ready:false },
     ]
   },
 ]
 
-// ─── Page renderer ────────────────────────────────────────────────────────────
-
-function renderPage(pageId) {
-  switch (pageId) {
-    case 'spectrum':   return <SpectrumChart />
-    default:           return <ComingSoon pageId={pageId} />
-  }
-}
-
-// ─── Coming Soon placeholder ─────────────────────────────────────────────────
-
-function ComingSoon({ pageId }) {
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      height: '100%', gap: 16, color: 'var(--text-muted)',
-    }}>
-      <div style={{ fontSize: 48 }}>🚧</div>
-      <div style={{ fontSize: 18, color: 'var(--text-secondary)', fontWeight: 600 }}>
-        En développement
-      </div>
-      <div style={{ fontSize: 13 }}>
-        Module <code style={{ color: 'var(--accent-blue)' }}>{pageId}</code> — Session prochaine
-      </div>
-    </div>
-  )
-}
-
-// ─── Sidebar ──────────────────────────────────────────────────────────────────
-
-function Sidebar({ activePage, onNavigate }) {
+function Sidebar({ activePage, onNavigate, c, isDark, onToggleTheme }) {
   return (
     <aside style={{
-      width: 240, flexShrink: 0,
-      background: 'var(--bg-surface)',
-      borderRight: '1px solid var(--border)',
-      display: 'flex', flexDirection: 'column',
-      height: '100vh', overflow: 'hidden',
+      width:220, flexShrink:0,
+      background:c.surface,
+      borderRight:`1px solid ${c.border}`,
+      display:'flex', flexDirection:'column',
+      height:'100vh', overflow:'hidden',
+      transition:'background 0.2s, border-color 0.2s',
     }}>
-
       {/* Logo */}
-      <div style={{
-        padding: '24px 20px 20px',
-        borderBottom: '1px solid var(--border)',
-      }}>
+      <div style={{ padding:'22px 18px 16px', borderBottom:`1px solid ${c.border}` }}>
         <div style={{
-          fontSize: 20, fontWeight: 700,
-          background: 'linear-gradient(135deg, #f8fafc, #94a3b8)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          letterSpacing: '-0.02em',
+          fontSize:19, fontWeight:700, color:c.text,
+          letterSpacing:'-0.02em',
         }}>
           StructCalc
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+        <div style={{ fontSize:11, color:c.textMuted, marginTop:3 }}>
           RPA 2024 · CBA93 · BAEL91
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
-        {NAV_ITEMS.map(group => (
-          <div key={group.section} style={{ marginBottom: 8 }}>
-
-            {/* Section label */}
+      {/* Nav */}
+      <nav style={{ flex:1, overflowY:'auto', padding:'10px 0' }}>
+        {NAV.map(group => (
+          <div key={group.section} style={{ marginBottom:6 }}>
             <div style={{
-              fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase',
-              color: 'var(--text-muted)', padding: '10px 20px 6px',
+              fontSize:10, letterSpacing:'0.1em', textTransform:'uppercase',
+              color:c.textMuted, padding:'10px 18px 5px',
             }}>
               {group.section}
             </div>
-
-            {/* Items */}
             {group.items.map(item => {
               const isActive = item.id === activePage
               return (
-                <button
-                  key={item.id}
+                <button key={item.id}
                   onClick={() => item.ready && onNavigate(item.id)}
                   style={{
-                    width: '100%', display: 'flex', alignItems: 'center',
-                    gap: 10, padding: '9px 20px',
-                    background: isActive ? '#1e3a5f' : 'transparent',
-                    border: 'none',
+                    width:'100%', display:'flex', alignItems:'center',
+                    gap:9, padding:'8px 18px',
+                    background: isActive
+                      ? (isDark ? '#1e3a5f' : '#dbeafe')
+                      : 'transparent',
+                    border:'none',
                     borderLeft: isActive
-                      ? '2px solid var(--accent-blue)'
+                      ? `2px solid ${c.blue}`
                       : '2px solid transparent',
                     color: item.ready
-                      ? (isActive ? 'var(--text-primary)' : 'var(--text-secondary)')
-                      : 'var(--text-muted)',
+                      ? (isActive ? c.blue : c.textSec)
+                      : c.textMuted,
                     cursor: item.ready ? 'pointer' : 'default',
-                    fontSize: 13, textAlign: 'left',
-                    transition: 'background 0.15s',
-                  }}
-                >
-                  <span style={{ fontSize: 15 }}>{item.icon}</span>
-                  <span style={{ flex: 1 }}>{item.label}</span>
+                    fontSize:13, textAlign:'left',
+                  }}>
+                  <span style={{ fontSize:14 }}>{item.icon}</span>
+                  <span style={{ flex:1 }}>{item.label}</span>
                   {!item.ready && (
                     <span style={{
-                      fontSize: 9, letterSpacing: '0.05em',
-                      background: 'var(--bg-elevated)',
-                      color: 'var(--text-muted)',
-                      borderRadius: 4, padding: '2px 5px',
+                      fontSize:9, background:c.elevated,
+                      color:c.textMuted, borderRadius:4, padding:'2px 5px',
                     }}>
                       BIENTÔT
                     </span>
@@ -159,36 +118,61 @@ function Sidebar({ activePage, onNavigate }) {
         ))}
       </nav>
 
-      {/* Footer */}
+      {/* Theme toggle + version */}
       <div style={{
-        padding: '14px 20px',
-        borderTop: '1px solid var(--border)',
-        fontSize: 11, color: 'var(--text-muted)',
+        padding:'12px 18px', borderTop:`1px solid ${c.border}`,
+        display:'flex', alignItems:'center', justifyContent:'space-between',
       }}>
-        v0.1.0 — Session 3
+        <span style={{ fontSize:11, color:c.textMuted }}>v0.1.0</span>
+        <button onClick={onToggleTheme} style={{
+          background:c.elevated, border:`1px solid ${c.border}`,
+          borderRadius:7, padding:'5px 10px', cursor:'pointer',
+          color:c.textSec, fontSize:12,
+        }}>
+          {isDark ? '☀️ Clair' : '🌙 Sombre'}
+        </button>
       </div>
     </aside>
   )
 }
 
-// ─── Root App ────────────────────────────────────────────────────────────────
+function ComingSoon({ c }) {
+  return (
+    <div style={{
+      display:'flex', flexDirection:'column', alignItems:'center',
+      justifyContent:'center', height:'100%', gap:14, color:c.textMuted,
+    }}>
+      <div style={{ fontSize:44 }}>🚧</div>
+      <div style={{ fontSize:17, color:c.textSec, fontWeight:600 }}>En développement</div>
+      <div style={{ fontSize:13 }}>Session prochaine</div>
+    </div>
+  )
+}
 
 export default function App() {
+  const [isDark, setIsDark] = useState(true)
   const [activePage, setActivePage] = useState('spectrum')
+  const c = isDark ? DARK : LIGHT
+
+  function renderPage() {
+    switch (activePage) {
+      case 'spectrum': return <SpectrumChart c={c} isDark={isDark} />
+      default:         return <ComingSoon c={c} />
+    }
+  }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-
-      <Sidebar activePage={activePage} onNavigate={setActivePage} />
-
-      {/* Main content */}
-      <main style={{
-        flex: 1, overflowY: 'auto',
-        background: 'var(--bg-base)',
-      }}>
-        {renderPage(activePage)}
+    <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:c.bg }}>
+      <Sidebar
+        activePage={activePage}
+        onNavigate={setActivePage}
+        c={c}
+        isDark={isDark}
+        onToggleTheme={() => setIsDark(d => !d)}
+      />
+      <main style={{ flex:1, overflowY:'auto', background:c.bg, transition:'background 0.2s' }}>
+        {renderPage()}
       </main>
-
     </div>
   )
 }
