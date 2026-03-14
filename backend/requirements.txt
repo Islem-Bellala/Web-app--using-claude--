@@ -1,0 +1,16 @@
+# StructCalc — Backend Python Dependencies
+# ==========================================
+# Install with:
+#   pip install -r requirements.txt
+#
+# Run the server with (from the structcalc/ root):
+#   uvicorn backend.main:app --reload --port 8000
+
+fastapi==0.115.5
+uvicorn[standard]==0.32.0
+pydantic==2.10.3
+
+# Future sessions will add:
+# sqlalchemy       — database (Session: Projects/Models/Calculations)
+# alembic          — migrations
+# psycopg2-binary  — PostgreSQL driver

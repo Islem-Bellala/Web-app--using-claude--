@@ -4,14 +4,15 @@
  */
 
 import { useState } from 'react'
-import SpectrumChart from './components/seismic/SpectrumChart.jsx'
+import SpectrumChart  from './components/seismic/SpectrumChart.jsx'
+import BaseShearPage  from './components/seismic/BaseShearPage.jsx'
 
 const DARK = {
   bg:'#020817', surface:'#0a1628', elevated:'#0f172a',
-  border:'#1e293b', borderLight:'#334155',
-  text:'#f8fafc', textSec:'#94a3b8', textMuted:'#475569',
-  blue:'#3b82f6', green:'#34d399', amber:'#f59e0b',
-  red:'#f87171', purple:'#a78bfa',
+  border:'#1e293b', borderLight:'#475569',
+  text:'#f1f5f9', textSec:'#cbd5e1', textMuted:'#94a3b8',
+  blue:'#60a5fa', green:'#34d399', amber:'#fbbf24',
+  red:'#f87171', purple:'#c4b5fd',
 }
 const LIGHT = {
   bg:'#f8fafc', surface:'#ffffff', elevated:'#f1f5f9',
@@ -26,7 +27,7 @@ const NAV = [
     section: 'Sismique — RPA 2024',
     items: [
       { id:'spectrum',     label:'Spectre de réponse', icon:'📈', ready:true  },
-      { id:'base_shear',   label:'Effort tranchant V', icon:'⚡', ready:false },
+      { id:'base_shear',   label:'Effort tranchant V', icon:'⚡', ready:true  },
       { id:'combinations', label:'Combinaisons',        icon:'🔗', ready:false },
     ]
   },
@@ -156,8 +157,9 @@ export default function App() {
 
   function renderPage() {
     switch (activePage) {
-      case 'spectrum': return <SpectrumChart c={c} isDark={isDark} />
-      default:         return <ComingSoon c={c} />
+      case 'spectrum':   return <SpectrumChart c={c} isDark={isDark} />
+      case 'base_shear': return <BaseShearPage  c={c} />
+      default:           return <ComingSoon c={c} />
     }
   }
 
