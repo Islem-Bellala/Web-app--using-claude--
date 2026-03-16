@@ -211,7 +211,7 @@ function ComingSoon({ c }) {
 }
 
 export default function App() {
-  const [isDark,      setIsDark]      = useState(true)
+  const [isDark,      setIsDark]      = useState(false)
   const [activePage,  setActivePage]  = useState('params')
   const [params,      setParams]      = useState(DEFAULT_PARAMS)
   const [sidebarOpen, setSidebarOpen] = useState(true)
