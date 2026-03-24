@@ -88,10 +88,10 @@ def compute_spectrum_endpoint(payload: dict):
     will be implemented in the next session.
     """
     # TODO: Replace with proper schema + service call
-    from calculation_engine.seismic.rpa2024.parameters import (
+    from calc_engine.seismic.rpa2024.parameters import (
         SeismicZone, SiteClass, ImportanceGroup
     )
-    from calculation_engine.seismic.rpa2024.spectrum import (
+    from calc_engine.seismic.rpa2024.spectrum import (
         SpectrumInput, compute_spectrum
     )
 

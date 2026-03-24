@@ -16,19 +16,14 @@ Run with:
     python -m pytest tests/test_spectrum.py -v
 """
 
-import sys
-import os
 import math
 
-# Make the project importable from the tests folder
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-from calculation_engine.seismic.rpa2024.parameters import (
+from calc_engine.seismic.rpa2024.parameters import (
     SeismicZone, SiteClass, ImportanceGroup,
     get_spectrum_params, get_damping_factor, get_spectrum_type,
     SpectrumType, ZONE_ACCELERATION, IMPORTANCE_FACTOR,
 )
-from calculation_engine.seismic.rpa2024.spectrum import (
+from calc_engine.seismic.rpa2024.spectrum import (
     SpectrumInput, compute_spectrum, compute_Sae_g,
 )
 

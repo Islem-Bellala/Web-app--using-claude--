@@ -24,11 +24,11 @@ from backend.schemas.spectrum_schema import (
     CurveOut,
     SpectrumPoint,
 )
-from calculation_engine.seismic.rpa2024.design_spectrum import (
+from calc_engine.seismic.rpa2024.design_spectrum import (
     DesignSpectrumInput,
     compute_design_spectra,
 )
-from calculation_engine.seismic.rpa2024.parameters import (
+from calc_engine.seismic.rpa2024.parameters import (
     SeismicZone,
     SiteClass,
     ImportanceGroup,

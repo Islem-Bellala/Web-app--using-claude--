@@ -35,7 +35,7 @@ except ImportError:
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
-from calculation_engine.core.structural_model import (
+from calc_engine.core.structural_model import (
     StructuralModel, Node, Member, Section, Material,
     LoadCase, Story, MemberForce,
     MemberType, MaterialType, LoadCaseType,

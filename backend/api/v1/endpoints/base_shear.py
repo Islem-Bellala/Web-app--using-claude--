@@ -8,11 +8,11 @@ from fastapi import APIRouter, HTTPException
 from backend.schemas.base_shear_schema import (
     BaseShearRequest, BaseShearResponse, StoryForceOut,
 )
-from calculation_engine.seismic.rpa2024.base_shear import (
+from calc_engine.seismic.rpa2024.base_shear import (
     BaseShearInput, StoryMass, compute_base_shear,
     get_design_period, compute_empirical_period,
 )
-from calculation_engine.seismic.rpa2024.parameters import (
+from calc_engine.seismic.rpa2024.parameters import (
     SeismicZone, SiteClass, ImportanceGroup,
 )
 
