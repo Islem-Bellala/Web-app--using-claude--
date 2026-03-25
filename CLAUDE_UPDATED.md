@@ -237,13 +237,13 @@ Each layer is independent and testable.
 - Fluid interactions, minimal manual effort, minimal cognitive load
 - Intuitive data visualization (tables, charts, diagrams)
 
-### 4.3 Current UI Parameters (until redesign)
+### 4.3 Current UI Parameters (until Phase 6 redesign)
 
 - `zoom: 1.35` on main content
 - `zoom: 1.08` on sidebar (height = 100vh / 1.08 for night mode button fix)
 - `zoom: 0.9` on ProjectParams page
 - Modals use `zoom: 1` (no scaling)
-- These will be replaced by a proper design system in the UI redesign phase
+- These will be replaced by a proper design system in Phase 6
 
 ---
 
@@ -265,86 +265,90 @@ Each layer is independent and testable.
 ## 6. PROJECT STRUCTURE
 
 ```
-bunyan/
-├── CLAUDE.md                          # This file — Claude Code reads this first
-├── README.md                          # Project overview
+bunyan/                                    # Project root
+├── CLAUDE.md                              # This file
+├── README.md
 ├── .gitignore
-├── pyproject.toml                     # Python project config
+├── pyproject.toml
 ├── requirements.txt
 │
 ├── docs/
-│   ├── architecture.md                # Architecture decisions & principles
-│   ├── session-log.md                 # Session history
-│   └── formulas/                      # Formula references per module
+│   ├── architecture.md
+│   ├── session-log.md
+│   └── formulas/
 │       └── rpa2024-seismic.md
 │
-├── calc_engine/                       # ALL engineering logic lives here
+├── calc_engine/                           # ALL engineering logic
 │   ├── __init__.py
 │   ├── seismic/
 │   │   └── rpa2024/
 │   │       ├── __init__.py
-│   │       ├── parameters.py          # Seismic zone params, soil classes
-│   │       ├── spectrum.py            # Elastic spectrum Sae/g
-│   │       ├── design_spectrum.py     # Sad (Eq 3.15) + Svd (Eq 3.16)
-│   │       ├── base_shear.py          # V = λ·Sad·W (Eq 3.1)
-│   │       └── annex_a.py             # Wilaya/commune/zone — SINGLE SOURCE
-│   ├── rc_design/                     # Future: CBA93, BAEL91, EC2
+│   │       ├── parameters.py
+│   │       ├── spectrum.py              # Elastic spectrum Sae/g
+│   │       ├── design_spectrum.py       # Sad (Eq 3.15) + Svd (Eq 3.16)
+│   │       ├── base_shear.py            # V = λ·Sad·W (Eq 3.1)
+│   │       └── annex_a.py              # Wilaya/commune/zone — SINGLE SOURCE
+│   ├── rc_design/                        # Future: CBA93, BAEL91, EC2
 │   │   └── __init__.py
-│   └── core/                          # Future: Unified Structural Model
+│   └── core/                             # Future: Unified Structural Model
 │       └── __init__.py
 │
 ├── backend/
-│   ├── main.py                        # FastAPI app entry
-│   ├── config.py                      # Pydantic BaseSettings
-│   ├── database.py                    # SQLAlchemy setup (Phase 5)
+│   ├── main.py                           # FastAPI app entry
+│   ├── config.py                         # Pydantic BaseSettings
+│   ├── database.py                       # SQLAlchemy setup (Phase 5)
 │   ├── api/
 │   │   └── v1/
 │   │       ├── __init__.py
-│   │       ├── router.py              # Central router
+│   │       ├── router.py                # Central router
 │   │       └── endpoints/
 │   │           ├── spectrum.py
 │   │           ├── base_shear.py
-│   │           └── annex_a.py         # Serve wilaya/commune/zone data
+│   │           └── annex_a.py           # Serve wilaya/commune/zone data
 │   ├── schemas/
 │   │   ├── seismic.py
+│   │   ├── annex_a.py
 │   │   └── common.py
-│   ├── models/                        # SQLAlchemy models (Phase 5)
+│   ├── models/                           # SQLAlchemy models (Phase 5)
 │   │   └── __init__.py
-│   └── services/                      # Business logic orchestration
+│   └── services/                         # Business logic orchestration
 │       └── __init__.py
 │
 ├── frontend/
 │   ├── package.json
 │   ├── tsconfig.json
+│   ├── tsconfig.node.json
 │   ├── vite.config.ts
+│   ├── vite-env.d.ts
 │   └── src/
-│       ├── App.tsx
+│       ├── App.tsx                       # Thin layout shell (~207 lines)
 │       ├── main.tsx
-│       ├── types/                     # Shared TypeScript interfaces
-│       │   ├── seismic.ts
-│       │   ├── project.ts
-│       │   └── structural.ts
-│       ├── stores/                    # Zustand state management
-│       │   ├── projectStore.ts
-│       │   ├── seismicStore.ts
-│       │   └── uiStore.ts
-│       ├── services/                  # API client layer
-│       │   └── api.ts
+│       ├── types/                        # Shared TypeScript interfaces
+│       │   ├── project.ts               # Story, GlobalParams
+│       │   ├── seismic.ts               # SpectrumRequest/Result, BaseShearRequest/Result, WilayaInfo, CommuneInfo
+│       │   ├── ui.ts                    # AppColors, ThemeMode, ModalBaseProps
+│       │   └── index.ts                 # Barrel export
+│       ├── stores/                       # Zustand state management
+│       │   ├── projectStore.ts          # 9 fields: wilaya, commune, zone, site, group, metadata
+│       │   ├── seismicStore.ts          # 20 fields: QF, R, periods, base shear, bracing systems
+│       │   ├── structuralStore.ts       # stories array with CRUD actions
+│       │   ├── uiStore.ts              # theme, sidebar, activePage
+│       │   └── index.ts                 # Barrel export
+│       ├── services/                     # API client layer
+│       │   └── api.ts                   # Typed fetch functions with AbortController
 │       ├── components/
 │       │   ├── shared/
-│       │   │   ├── QFModal.tsx
-│       │   │   └── RModal.tsx
-│       │   ├── layout/
-│       │   │   ├── Sidebar.tsx
-│       │   │   ├── TopBar.tsx
-│       │   │   └── AppShell.tsx       # Fixed viewport container
+│       │   │   ├── QFModal.tsx          # Quality factor modal (controlled component)
+│       │   │   └── RModal.tsx           # Behavior factor modal (controlled component)
+│       │   ├── layout/                   # Placeholder for Phase 6
+│       │   │   └── .gitkeep
 │       │   ├── general/
-│       │   │   └── ProjectParams.tsx
+│       │   │   └── ProjectParams.tsx    # Reads from all stores directly
 │       │   └── seismic/
-│       │       ├── SpectrumChart.tsx
-│       │       └── BaseShearPage.tsx
+│       │       ├── SpectrumChart.tsx     # Reads from project+seismic stores
+│       │       └── BaseShearPage.tsx    # Reads from project+seismic+structural stores
 │       └── styles/
-│           └── theme.ts              # Design tokens, colors, theme
+│           └── .gitkeep
 │
 ├── tests/
 │   ├── engine/
@@ -353,9 +357,9 @@ bunyan/
 │   │       ├── test_base_shear.py
 │   │       └── test_annex_a.py
 │   └── backend/
-│       └── test_endpoints.py
+│       └── __init__.py
 │
-└── bridge/                            # Future: desktop bridge agent
+└── bridge/                               # Future: desktop bridge agent
     ├── __init__.py
     └── adapters/
         ├── robot_adapter.py
@@ -388,11 +392,12 @@ bunyan/
 
 ### Frontend (`frontend/src/`)
 
-- ALL files are TypeScript (.tsx / .ts) — no .jsx / .js
+- ALL files are TypeScript (.tsx / .ts) — no .jsx / .js in src/
 - Shared types in `frontend/src/types/`
 - State management via Zustand stores in `frontend/src/stores/`
 - API calls via `frontend/src/services/api.ts` — never raw fetch in components
 - Components read from stores, not prop drilling from App.tsx
+- Modals are controlled components (receive props, don't couple to stores)
 - All user-facing text: French
 - All code, comments, variable names: English
 
@@ -406,7 +411,38 @@ bunyan/
 
 ---
 
-## 8. LANGUAGE RULES
+## 8. ZUSTAND STORE ARCHITECTURE
+
+### Store Layout (implemented in Phase 3)
+
+| Store | Fields | Responsibility |
+|-------|--------|---------------|
+| `projectStore` | 9 fields, 7 actions | Location (wilaya, commune, zone), site classification, project metadata |
+| `seismicStore` | 20 fields, 7 actions | QF/R params, bracing system, periods, base shear results, two-direction mode |
+| `structuralStore` | stories[], 5 actions | Building stories with elevation, weight, drift ratios |
+| `uiStore` | 3 fields, 3 actions | Theme (dark/light), sidebar state, active page |
+
+### Patterns
+
+- **Generic setter**: `seismicStore.setField<K>(key, value)` for individual field updates
+- **Batch setter**: `setQFParams(partial)`, `setRParams(partial)` for related field groups
+- **Modals**: Use Option B — controlled components receiving data via props from parent
+- **Components**: Import stores directly, no props drilling through App.tsx
+
+### Component → Store Mapping
+
+| Component | Reads from |
+|-----------|-----------|
+| App.tsx | uiStore (theme, sidebar, activePage) |
+| ProjectParams | projectStore + seismicStore + structuralStore |
+| SpectrumChart | projectStore + seismicStore |
+| BaseShearPage | projectStore + seismicStore + structuralStore |
+| QFModal | props from parent (controlled) |
+| RModal | props from parent (controlled) |
+
+---
+
+## 9. LANGUAGE RULES
 
 - **Application interface**: French (for Algerian engineers)
 - **Code, comments, variables, git commits**: English
@@ -416,7 +452,7 @@ bunyan/
 
 ---
 
-## 9. GIT CONVENTIONS
+## 10. GIT CONVENTIONS
 
 - Branch naming: `feature/<module>`, `fix/<issue>`, `refactor/<scope>`
 - Commit messages: imperative mood, reference the module
@@ -427,7 +463,7 @@ bunyan/
 
 ---
 
-## 10. DATA VALIDATION & ERROR HANDLING
+## 11. DATA VALIDATION & ERROR HANDLING
 
 ### Data Validation
 
@@ -448,7 +484,7 @@ Errors must be descriptive, logged, and user-friendly (in French).
 
 ---
 
-## 11. SECURITY
+## 12. SECURITY
 
 - JWT-based authentication
 - Each user can only access their own projects
@@ -456,7 +492,7 @@ Errors must be descriptive, logged, and user-friendly (in French).
 
 ---
 
-## 12. ENGINEERING FORMULAS — WORKING RULES
+## 13. ENGINEERING FORMULAS — WORKING RULES
 
 1. **Observations before code** — present all findings and observations first
 2. **If a formula is uncertain → ASK before coding** — never guess
@@ -468,41 +504,39 @@ Errors must be descriptive, logged, and user-friendly (in French).
 
 ---
 
-## 13. CURRENT STATE
+## 14. CURRENT STATE
 
-### Completed Modules
+### Completed Foundation Phases
+
+- ✅ **Phase 1**: Project restructure, CLAUDE.md, annex_a.py, central router, config
+- ✅ **Phase 2**: Full TypeScript migration, shared types, typed API service
+- ✅ **Phase 3**: Zustand stores (4 stores), all components rewired, App.tsx is thin shell
+
+### Completed Engineering Modules
 
 - ✅ **Elastic spectrum** Sae/g — `calc_engine/seismic/rpa2024/spectrum.py`
 - ✅ **Design spectrum** Sad Eq 3.15 — `calc_engine/seismic/rpa2024/design_spectrum.py`
 - ✅ **Design spectrum** Svd Eq 3.16 — `calc_engine/seismic/rpa2024/design_spectrum.py`
 - ✅ **Base shear** V = λ·Sad·W Eq 3.1 — `calc_engine/seismic/rpa2024/base_shear.py`
-- ✅ **FastAPI endpoints** — POST /api/v1/spectrum, POST /api/v1/base_shear
+- ✅ **Annex A** — 58 wilayas, commune-level zones (single source in calc_engine)
+- ✅ **FastAPI endpoints** — spectrum, base_shear, annex_a (wilayas, communes, zone)
 - ✅ **React pages** — ProjectParams, SpectrumChart, BaseShearPage
-- ✅ **23 passing tests** for engine modules
-- ✅ **QF Modal** with category-based calculation per RPA 2024
-- ✅ **R Modal** with 6 material tabs, 25 bracing systems from Table 3.18
-- ✅ **Annex A data** for all 58 wilayas (verified against official Excel)
+- ✅ **23 spectrum/base_shear tests + 29 annex_a tests = 52 total**
 
-### Key Formulas Implemented
+### Pending Foundation Phases
 
-- `Sad(T)/g` — Eq 3.15 (4 branches + floor 0.2·A·I)
-- `Svd(T)/g` — Eq 3.16 (alpha exponent, R=1.5 fixed)
-- `QF = 1 + ΣPq` — capped per category
-- `V = λ · Sad(T₀)/g · W` — where λ=0.85 if T₀≤2T₂ AND n>2, else 1.0
-- `Ft = 0.07·T₀·V` — (max 0.25V) if T₀ > 0.7s
-- `T_emp = CT · hₙ^0.75`
-- `T₀ = min(T_calc, 1.3·T_emp)`
-- 80% check: `Vt ≥ 0.8·V`, majoration coeff = 0.8·V/Vt
+- 🔄 **Phase 4**: Data deduplication + API layer cleanup ← NEXT
+- 🔄 **Phase 5**: PostgreSQL + auth
+- 🔄 **Phase 6**: Fixed viewport UI redesign
 
-### Pending (Foundation Upgrade)
+### Pending — Phase 4 Specifics
 
-- 🔄 TypeScript migration
-- 🔄 Zustand state management (replace props drilling)
-- 🔄 Data deduplication (Annex A → backend only)
-- 🔄 Database + auth (PostgreSQL)
-- 🔄 Fixed viewport UI redesign
+- ProjectParams.tsx and SpectrumChart.tsx still have hardcoded WILAYAS/WILAYA_COMMUNES data
+- Components should fetch this data from backend API instead
+- All engineering computation should flow through api.ts service, not direct fetch()
+- Zone derivation should use backend endpoint
 
-### Not Started
+### Future Modules
 
 - ⏳ Seismic combinations
 - ⏳ RC design — CBA93
@@ -514,7 +548,20 @@ Errors must be descriptive, logged, and user-friendly (in French).
 
 ---
 
-## 14. PROGRESSIVE DEVELOPMENT STRATEGY
+## 15. KEY FORMULAS IMPLEMENTED
+
+- `Sad(T)/g` — Eq 3.15 (4 branches + floor 0.2·A·I)
+- `Svd(T)/g` — Eq 3.16 (alpha exponent, R=1.5 fixed)
+- `QF = 1 + ΣPq` — capped per category
+- `V = λ · Sad(T₀)/g · W` — where λ=0.85 if T₀≤2T₂ AND n>2, else 1.0
+- `Ft = 0.07·T₀·V` — (max 0.25V) if T₀ > 0.7s
+- `T_emp = CT · hₙ^0.75`
+- `T₀ = min(T_calc, 1.3·T_emp)`
+- 80% check: `Vt ≥ 0.8·V`, majoration coeff = 0.8·V/Vt
+
+---
+
+## 16. PROGRESSIVE DEVELOPMENT STRATEGY
 
 ### Software Integration Order
 
@@ -546,7 +593,7 @@ New modules must plug into the existing architecture cleanly.
 
 ---
 
-## 15. COMMON PATTERNS
+## 17. COMMON PATTERNS
 
 ### Adding a New Engine Module
 
@@ -558,8 +605,8 @@ New modules must plug into the existing architecture cleanly.
 
 ### Adding a New API Endpoint
 
-1. Create endpoint in `backend/api/v1/endpoints/<name>.py`
-2. Define schemas in `backend/schemas/<name>.py`
+1. Create endpoint in `backend/api/v1/endpoints/<n>.py`
+2. Define schemas in `backend/schemas/<n>.py`
 3. Import engine functions — NO formula logic in the endpoint
 4. Register router in `backend/api/v1/router.py`
 
@@ -573,7 +620,7 @@ New modules must plug into the existing architecture cleanly.
 
 ---
 
-## 16. PERFORMANCE & MONITORING
+## 18. PERFORMANCE & MONITORING
 
 - Calculations optimized for large models
 - Asynchronous processing where necessary
@@ -583,7 +630,7 @@ New modules must plug into the existing architecture cleanly.
 
 ---
 
-## 17. DESIGN SUGGESTIONS (FUTURE)
+## 19. DESIGN SUGGESTIONS (FUTURE)
 
 When elements fail verification, the system may suggest corrections:
 
@@ -594,7 +641,7 @@ When elements fail verification, the system may suggest corrections:
 
 ---
 
-## 18. REPORT GENERATION (FUTURE)
+## 20. REPORT GENERATION (FUTURE)
 
 Export formats: PDF, Word
 
@@ -610,7 +657,7 @@ Export levels: Summary / Standard / Detailed
 
 ---
 
-## 19. SUPPORTED SOFTWARE APIs
+## 21. SUPPORTED SOFTWARE APIs
 
 ### ETABS
 
@@ -635,7 +682,7 @@ A lightweight Python agent runs locally:
 
 ---
 
-## 20. UNIFIED STRUCTURAL MODEL (FUTURE)
+## 22. UNIFIED STRUCTURAL MODEL (FUTURE)
 
 | Entity      | Fields                                           |
 |-------------|--------------------------------------------------|
@@ -648,7 +695,7 @@ The calculation engine works exclusively with USM entities.
 
 ---
 
-## 21. DATABASE STRUCTURE (FUTURE)
+## 23. DATABASE STRUCTURE (FUTURE — Phase 5)
 
 - Projects
 - Models
