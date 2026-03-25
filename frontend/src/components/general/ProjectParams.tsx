@@ -9,13 +9,33 @@
  */
 
 import { useState } from "react"
-import QFModal, { DEF_CHECKED } from "../shared/QFModal.jsx"
-import RModal    from "../shared/RModal.jsx"
+import QFModal, { DEF_CHECKED } from "../shared/QFModal"
+import RModal, { type BracingSystem } from "../shared/RModal"
+import type { GlobalParams, AppColors } from "../../types"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WILAYA DATA — RPA 2024 Annex A
+// NOTE: Still hardcoded here — will be removed in Phase 4 (fetched from API)
 // ─────────────────────────────────────────────────────────────────────────────
-const WILAYAS = [
+
+interface WilayaEntry {
+  code: string;
+  name: string;
+  zone: string;
+  split: boolean;
+}
+
+interface CommuneEntry {
+  name: string;
+  zone: string;
+}
+
+interface CommuneData {
+  defaultZone: string;
+  communes: CommuneEntry[];
+}
+
+const WILAYAS: WilayaEntry[] = [
   {code:"01",name:"Adrar",              zone:"0",  split:false},
   {code:"02",name:"Chlef",              zone:"VI", split:true },
   {code:"03",name:"Laghouat",           zone:"II", split:true },
@@ -77,7 +97,7 @@ const WILAYAS = [
 ]
 
 // Partial commune data (key split wilayas — same as SpectrumChart Session 5)
-const WILAYA_COMMUNES = {
+const WILAYA_COMMUNES: Record<string, CommuneData> = {
   "02":{defaultZone:"VI",communes:[{name:"Beni Bouattab",zone:"V"},{name:"Taougrite",zone:"V"},{name:"El Marsa",zone:"V"},{name:"Dahra",zone:"V"}]},
   "09":{defaultZone:"VI",communes:[]},
   "16":{defaultZone:"VI",communes:[]},
@@ -94,13 +114,19 @@ const WILAYA_COMMUNES = {
   "34":{defaultZone:"IV",communes:[{name:"Tafreg",zone:"V"},{name:"Djaafra",zone:"V"},{name:"El Main",zone:"V"}]},
 }
 
-const ZONE_LABELS = {
+const ZONE_LABELS: Record<string, string> = {
   "0":"Zone 0 — Très faible",
   "I":"Zone I (0.07g)","II":"Zone II (0.10g)","III":"Zone III (0.15g)",
   "IV":"Zone IV (0.20g)","V":"Zone V (0.25g)","VI":"Zone VI (0.30g)",
 }
 
-const FRAME_SYSTEMS = [
+interface FrameSystem {
+  v: string;
+  l: string;
+  ct: string;
+}
+
+const FRAME_SYSTEMS: FrameSystem[] = [
   {v:"ba_no_infill",   l:"Ossature BA sans remplissage",       ct:"CT=0.075"},
   {v:"steel_no_infill",l:"Ossature acier sans remplissage",    ct:"CT=0.085"},
   {v:"ba_with_infill", l:"Ossature BA/acier avec remplissage", ct:"CT=0.050"},
@@ -111,7 +137,7 @@ const FRAME_SYSTEMS = [
 // SMALL REUSABLE COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function BlockHeader({ title, color, c }) {
+function BlockHeader({ title, color, c }: { title: string; color: string; c: AppColors }) {
   return (
     <div style={{fontSize:11,letterSpacing:"0.08em",fontWeight:700,
       color:color,textTransform:"uppercase",marginBottom:12}}>
@@ -120,7 +146,7 @@ function BlockHeader({ title, color, c }) {
   )
 }
 
-function Field({ label, children, c }) {
+function Field({ label, children, c }: { label: string; children: React.ReactNode; c: AppColors }) {
   return (
     <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:10}}>
       <label style={{fontSize:11,letterSpacing:"0.06em",color:c.textSec,
@@ -130,7 +156,14 @@ function Field({ label, children, c }) {
   )
 }
 
-function TextInput({ value, onChange, placeholder, c, style={} }) {
+interface TextInputProps {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  c: AppColors;
+  style?: React.CSSProperties;
+}
+function TextInput({ value, onChange, placeholder, c, style = {} }: TextInputProps) {
   return (
     <input type="text" value={value} placeholder={placeholder}
       onChange={e => onChange(e.target.value)}
@@ -140,17 +173,14 @@ function TextInput({ value, onChange, placeholder, c, style={} }) {
   )
 }
 
-function NumInput({ value, onChange, placeholder, c, style={} }) {
-  return (
-    <input type="number" value={value} placeholder={placeholder}
-      onChange={e => onChange(e.target.value)}
-      style={{background:c.elevated,border:`1px solid ${c.border}`,
-        color:c.text,borderRadius:8,padding:"8px 10px",
-        fontSize:13,fontFamily:"monospace",outline:"none",...style}}/>
-  )
+interface DirButtonProps {
+  label: string;
+  active: boolean;
+  color: string;
+  onClick: () => void;
+  c: AppColors;
 }
-
-function DirButton({ label, active, color, onClick, c }) {
+function DirButton({ label, active, color, onClick, c }: DirButtonProps) {
   return (
     <button type="button" onClick={onClick} style={{
       flex:1,padding:"6px",borderRadius:8,cursor:"pointer",
@@ -164,44 +194,53 @@ function DirButton({ label, active, color, onClick, c }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PROPS
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ProjectParamsProps {
+  params: GlobalParams;
+  setParams: React.Dispatch<React.SetStateAction<GlobalParams>>;
+  c: AppColors;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function ProjectParams({ params, setParams, c }) {
-  // Modal visibility
-  const [showQF,  setShowQF]  = useState(null)  // null | "single" | "x" | "y"
-  const [showR,   setShowR]   = useState(null)  // null | "single" | "x" | "y"
+export default function ProjectParams({ params, setParams, c }: ProjectParamsProps) {
+  // Modal visibility — null | "single" | "x" | "y"
+  const [showQF,  setShowQF]  = useState<string | null>(null)
+  const [showR,   setShowR]   = useState<string | null>(null)
 
   // Derive zone from wilaya + commune
-  const wilaya      = WILAYAS.find(w => w.code === params.wilayaCode) || WILAYAS[8]
+  const wilaya      = WILAYAS.find(w => w.code === params.wilayaCode) ?? WILAYAS[8]
   const communeData = WILAYA_COMMUNES[params.wilayaCode]
   const hasCommunes = !!(communeData && communeData.communes.length > 0)
 
-  function deriveZone(code, commune) {
-    const w = WILAYAS.find(w2 => w2.code === code) || WILAYAS[8]
+  function deriveZone(code: string, commune: string): string {
+    const w = WILAYAS.find(w2 => w2.code === code) ?? WILAYAS[8]
     const cd = WILAYA_COMMUNES[code]
     if (!commune || !cd) return w.zone
     const found = cd.communes.find(c2 => c2.name === commune)
     return found ? found.zone : cd.defaultZone
   }
 
-  function update(key, val) {
+  function update<K extends keyof GlobalParams>(key: K, val: GlobalParams[K]) {
     setParams(p => ({...p, [key]:val}))
   }
 
-  function handleWilayaChange(code) {
+  function handleWilayaChange(code: string) {
     const newZone = deriveZone(code, "")
     setParams(p => ({...p, wilayaCode:code, commune:"", zone:newZone}))
   }
 
-  function handleCommuneChange(commune) {
+  function handleCommuneChange(commune: string) {
     const newZone = deriveZone(params.wilayaCode, commune)
     setParams(p => ({...p, commune, zone:newZone}))
   }
 
   // QF modal helpers
-  function openQF(dir) { setShowQF(dir) }
-  function handleQFValidate(qf, cat, chk) {
+  function handleQFValidate(qf: number, cat: string, chk: Record<string, boolean>) {
     if (showQF === "x")      setParams(p => ({...p, QFx:qf, qfCatX:cat, qfChkX:chk}))
     else if (showQF === "y") setParams(p => ({...p, QFy:qf, qfCatY:cat, qfChkY:chk}))
     else                     setParams(p => ({...p, QF:qf,  qfCat:cat,  qfChk:chk}))
@@ -209,11 +248,10 @@ export default function ProjectParams({ params, setParams, c }) {
   }
 
   // R modal helpers
-  function openR(dir) { setShowR(dir) }
-  function handleRValidate(r, sys) {
-    if (showR === "x")      setParams(p => ({...p, Rx:r, selSysX:sys?.id||1, qfCatX:sys?.qfCat||"a"}))
-    else if (showR === "y") setParams(p => ({...p, Ry:r, selSysY:sys?.id||1, qfCatY:sys?.qfCat||"a"}))
-    else                    setParams(p => ({...p, R:r,  selSys:sys?.id||1,  qfCat:sys?.qfCat||"a"}))
+  function handleRValidate(r: number | undefined, sys: BracingSystem | null | undefined) {
+    if (showR === "x")      setParams(p => ({...p, Rx:r??p.Rx, selSysX:sys?.id??1, qfCatX:sys?.qfCat??"a"}))
+    else if (showR === "y") setParams(p => ({...p, Ry:r??p.Ry, selSysY:sys?.id??1, qfCatY:sys?.qfCat??"a"}))
+    else                    setParams(p => ({...p, R:r??p.R,   selSys:sys?.id??1,  qfCat:sys?.qfCat??"a"}))
     setShowR(null)
   }
 
@@ -234,12 +272,12 @@ export default function ProjectParams({ params, setParams, c }) {
     setParams(p => ({...p, stories:[...p.stories, newStorey]}))
   }
 
-  function removeStorey(id) {
+  function removeStorey(id: number) {
     if (params.stories.length <= 1) return
     setParams(p => ({...p, stories:p.stories.filter(s => s.id !== id)}))
   }
 
-  function updateStorey(id, field, val) {
+  function updateStorey(id: number, field: string, val: string) {
     setParams(p => ({...p, stories:p.stories.map(s => s.id===id ? {...s,[field]:val} : s)}))
   }
 
@@ -249,7 +287,7 @@ export default function ProjectParams({ params, setParams, c }) {
     ? Math.max(...params.stories.map(s => parseFloat(s.elevation)||0))
     : 0
 
-  const inputStyle = {background:c.elevated,border:`1px solid ${c.border}`,
+  const inputStyle: React.CSSProperties = {background:c.elevated,border:`1px solid ${c.border}`,
     color:c.text,borderRadius:8,padding:"8px 10px",fontSize:13,outline:"none",width:"100%"}
 
   return (
@@ -411,7 +449,7 @@ export default function ProjectParams({ params, setParams, c }) {
             {!params.twoDir ? (
               <>
                 <Field label="Facteur qualité QF" c={c}>
-                  <button type="button" onClick={() => openQF("single")} style={{
+                  <button type="button" onClick={() => setShowQF("single")} style={{
                     width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
                     padding:"9px 11px",borderRadius:8,cursor:"pointer",
                     background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:13}}>
@@ -420,7 +458,7 @@ export default function ProjectParams({ params, setParams, c }) {
                   </button>
                 </Field>
                 <Field label="Coeff. comportement R" c={c}>
-                  <button type="button" onClick={() => openR("single")} style={{
+                  <button type="button" onClick={() => setShowR("single")} style={{
                     width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
                     padding:"9px 11px",borderRadius:8,cursor:"pointer",
                     background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:13}}>
@@ -439,14 +477,14 @@ export default function ProjectParams({ params, setParams, c }) {
                   borderRadius:8,padding:"10px",marginBottom:8}}>
                   <div style={{fontSize:11,color:c.blue,fontWeight:700,marginBottom:8,
                     textTransform:"uppercase",letterSpacing:"0.06em"}}>Direction X</div>
-                  <button type="button" onClick={() => openQF("x")} style={{
+                  <button type="button" onClick={() => setShowQF("x")} style={{
                     width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
                     padding:"8px 10px",borderRadius:7,cursor:"pointer",
                     background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12,marginBottom:6}}>
                     <span>Q<sub>Fx</sub> = <b style={{color:c.amber}}>{params.QFx.toFixed(2)}</b></span>
                     <span style={{fontSize:11,color:c.blue}}>Calculer →</span>
                   </button>
-                  <button type="button" onClick={() => openR("x")} style={{
+                  <button type="button" onClick={() => setShowR("x")} style={{
                     width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
                     padding:"8px 10px",borderRadius:7,cursor:"pointer",
                     background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12}}>
@@ -459,14 +497,14 @@ export default function ProjectParams({ params, setParams, c }) {
                   borderRadius:8,padding:"10px"}}>
                   <div style={{fontSize:11,color:c.purple,fontWeight:700,marginBottom:8,
                     textTransform:"uppercase",letterSpacing:"0.06em"}}>Direction Y</div>
-                  <button type="button" onClick={() => openQF("y")} style={{
+                  <button type="button" onClick={() => setShowQF("y")} style={{
                     width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
                     padding:"8px 10px",borderRadius:7,cursor:"pointer",
                     background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12,marginBottom:6}}>
                     <span>Q<sub>Fy</sub> = <b style={{color:c.amber}}>{params.QFy.toFixed(2)}</b></span>
                     <span style={{fontSize:11,color:c.blue}}>Calculer →</span>
                   </button>
-                  <button type="button" onClick={() => openR("y")} style={{
+                  <button type="button" onClick={() => setShowR("y")} style={{
                     width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
                     padding:"8px 10px",borderRadius:7,cursor:"pointer",
                     background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12}}>
@@ -582,12 +620,12 @@ export default function ProjectParams({ params, setParams, c }) {
 
             {/* Periods and dynamic shear */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-              {[
-                {label:"Période Tx (s)",key:"Tx",color:c.blue},
-                {label:"Période Ty (s)",key:"Ty",color:c.purple},
-                {label:"Effort dyn. Vxd (kN)",key:"Vxd",color:c.blue},
-                {label:"Effort dyn. Vyd (kN)",key:"Vyd",color:c.purple},
-              ].map(f => (
+              {([
+                {label:"Période Tx (s)",key:"Tx" as const,color:c.blue},
+                {label:"Période Ty (s)",key:"Ty" as const,color:c.purple},
+                {label:"Effort dyn. Vxd (kN)",key:"Vxd" as const,color:c.blue},
+                {label:"Effort dyn. Vyd (kN)",key:"Vyd" as const,color:c.purple},
+              ]).map(f => (
                 <div key={f.key}>
                   <label style={{fontSize:11,color:c.textSec,display:"block",
                     textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,marginBottom:4}}>

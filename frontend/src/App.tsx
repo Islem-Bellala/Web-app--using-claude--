@@ -4,18 +4,19 @@
  */
 
 import { useState } from 'react'
-import SpectrumChart  from './components/seismic/SpectrumChart.jsx'
-import BaseShearPage  from './components/seismic/BaseShearPage.jsx'
-import ProjectParams  from './components/general/ProjectParams.jsx'
+import SpectrumChart  from './components/seismic/SpectrumChart'
+import BaseShearPage  from './components/seismic/BaseShearPage'
+import ProjectParams  from './components/general/ProjectParams'
+import type { AppColors, GlobalParams } from './types'
 
-const DARK = {
+const DARK: AppColors = {
   bg:'#020817', surface:'#0a1628', elevated:'#0f172a',
   border:'#1e293b', borderLight:'#475569',
   text:'#f1f5f9', textSec:'#cbd5e1', textMuted:'#94a3b8',
   blue:'#60a5fa', green:'#34d399', amber:'#fbbf24',
   red:'#f87171', purple:'#c4b5fd',
 }
-const LIGHT = {
+const LIGHT: AppColors = {
   bg:'#f8fafc', surface:'#ffffff', elevated:'#f1f5f9',
   border:'#e2e8f0', borderLight:'#cbd5e1',
   text:'#0f172a', textSec:'#475569', textMuted:'#94a3b8',
@@ -23,7 +24,19 @@ const LIGHT = {
   red:'#dc2626', purple:'#7c3aed',
 }
 
-const NAV = [
+interface NavItem {
+  id: string;
+  label: string;
+  icon: string;
+  ready: boolean;
+}
+
+interface NavGroup {
+  section: string;
+  items: NavItem[];
+}
+
+const NAV: NavGroup[] = [
   {
     section: 'Général',
     items: [
@@ -60,7 +73,7 @@ const NAV = [
 // ─────────────────────────────────────────────────────────────────────────────
 const today = new Date().toISOString().split('T')[0]
 
-const DEFAULT_PARAMS = {
+const DEFAULT_PARAMS: GlobalParams = {
   // Block 1 — Identification
   projectName: '',
   engineer:    '',
@@ -105,7 +118,19 @@ const DEFAULT_PARAMS = {
   Vyd: '',
 }
 
-function Sidebar({ activePage, onNavigate, c, isDark, onToggleTheme }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// SUB-COMPONENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface SidebarProps {
+  activePage: string;
+  onNavigate: (id: string) => void;
+  c: AppColors;
+  isDark: boolean;
+  onToggleTheme: () => void;
+}
+
+function Sidebar({ activePage, onNavigate, c, isDark, onToggleTheme }: SidebarProps) {
   return (
     <aside style={{
       width:220, flexShrink:0,
@@ -182,7 +207,7 @@ function Sidebar({ activePage, onNavigate, c, isDark, onToggleTheme }) {
   )
 }
 
-function ComingSoon({ c }) {
+function ComingSoon({ c }: { c: AppColors }) {
   return (
     <div style={{
       display:'flex', flexDirection:'column', alignItems:'center',
@@ -195,12 +220,16 @@ function ComingSoon({ c }) {
   )
 }
 
-export default function App() {
-  const [isDark,      setIsDark]      = useState(false)
-  const [activePage,  setActivePage]  = useState('params')
-  const [params,      setParams]      = useState(DEFAULT_PARAMS)  // ← global shared state
+// ─────────────────────────────────────────────────────────────────────────────
+// APP
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const c = isDark ? DARK : LIGHT
+export default function App() {
+  const [isDark,      setIsDark]      = useState<boolean>(false)
+  const [activePage,  setActivePage]  = useState<string>('params')
+  const [params,      setParams]      = useState<GlobalParams>(DEFAULT_PARAMS)
+
+  const c: AppColors = isDark ? DARK : LIGHT
 
   function renderPage() {
     switch (activePage) {

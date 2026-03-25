@@ -17,16 +17,58 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ReferenceLine, ResponsiveContainer,
 } from "recharts"
+import type { GlobalParams, AppColors, SpectrumPoint } from "../../types"
 
-const ZONE_A = {"I":0.07,"II":0.10,"III":0.15,"IV":0.20,"V":0.25,"VI":0.30}
-const IMPORTANCE_I = {"1A":1.4,"1B":1.2,"2":1.0,"3":0.8}
+// ── Local types for spectrum state ──────────────────────────────────────────
+
+interface SpectrumBranchState {
+  A: number | string;
+  I: number | string;
+  S: number | string;
+  T1: number | string;
+  T2: number | string;
+  T3: number | string;
+  peak: number;
+  floor: number;
+  pts: SpectrumPoint[];
+}
+
+interface VerticalBranchState {
+  Av?: number | string;
+  I?: number | string;
+  T1: number | string;
+  T2: number | string;
+  T3: number | string;
+  peak: number;
+  floor: number;
+  pts: SpectrumPoint[];
+}
+
+interface SpectrumState {
+  hData: SpectrumBranchState;
+  vData: VerticalBranchState;
+  spectrum_type: string;
+}
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
 const TYPE1_ZONES = new Set(["IV","V","VI"])
+
+const EMPTY_H: SpectrumBranchState = { A:"—",I:"—",S:"—",T1:"—",T2:"—",T3:"—",peak:0,floor:0,pts:[] }
+const EMPTY_V: VerticalBranchState = { T1:"—",T2:"—",T3:"—",peak:0,floor:0,pts:[] }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // REUSABLE COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function Card({ label, value, unit, accent, c }) {
+interface CardProps {
+  label: string;
+  value: number | string;
+  unit?: string;
+  accent: string;
+  c: AppColors;
+}
+function Card({ label, value, unit, accent, c }: CardProps) {
   return (
     <div style={{background:c.elevated,border:`1px solid ${accent}44`,
       borderRadius:10,padding:"10px 12px",flex:1,minWidth:76}}>
@@ -39,7 +81,12 @@ function Card({ label, value, unit, accent, c }) {
   )
 }
 
-function ChartTooltip({ active, payload, c }) {
+interface ChartTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: SpectrumPoint }>;
+  c: AppColors;
+}
+function ChartTooltip({ active, payload, c }: ChartTooltipProps) {
   if (!active || !payload?.length) return null
   const d = payload[0].payload
   return (
@@ -55,7 +102,19 @@ function ChartTooltip({ active, payload, c }) {
   )
 }
 
-function MiniChart({ data, color, T1, T2, T3, floor, peak, label, eq, c }) {
+interface MiniChartProps {
+  data: SpectrumPoint[];
+  color: string;
+  T1: number | string;
+  T2: number | string;
+  T3: number | string;
+  floor: number;
+  peak: number;
+  label: string;
+  eq: string;
+  c: AppColors;
+}
+function MiniChart({ data, color, T1, T2, T3, floor, peak, label, eq, c }: MiniChartProps) {
   return (
     <div style={{background:c.surface,border:`1px solid ${c.border}`,
       borderRadius:12,padding:"16px 12px 10px",flex:1,minWidth:260}}>
@@ -77,11 +136,11 @@ function MiniChart({ data, color, T1, T2, T3, floor, peak, label, eq, c }) {
           <YAxis tick={{fill:c.textSec,fontSize:10}}
             label={{value:"Sa/g",angle:-90,position:"insideLeft",offset:13,fill:c.textSec,fontSize:10}}/>
           <Tooltip content={<ChartTooltip c={c}/>}/>
-          <ReferenceLine x={T1} stroke={c.borderLight} strokeDasharray="4 3"
+          <ReferenceLine x={typeof T1 === 'number' ? T1 : undefined} stroke={c.borderLight} strokeDasharray="4 3"
             label={{value:"T₁",fill:c.textSec,fontSize:10,position:"top"}}/>
-          <ReferenceLine x={T2} stroke={c.borderLight} strokeDasharray="4 3"
+          <ReferenceLine x={typeof T2 === 'number' ? T2 : undefined} stroke={c.borderLight} strokeDasharray="4 3"
             label={{value:"T₂",fill:c.textSec,fontSize:10,position:"top"}}/>
-          <ReferenceLine x={T3} stroke={c.borderLight} strokeDasharray="4 3"
+          <ReferenceLine x={typeof T3 === 'number' ? T3 : undefined} stroke={c.borderLight} strokeDasharray="4 3"
             label={{value:"T₃",fill:c.textSec,fontSize:10,position:"top"}}/>
           <ReferenceLine y={peak}  stroke={c.red+"44"}   strokeDasharray="3 3"/>
           <ReferenceLine y={floor} stroke={c.amber+"44"} strokeDasharray="3 3"/>
@@ -93,8 +152,8 @@ function MiniChart({ data, color, T1, T2, T3, floor, peak, label, eq, c }) {
   )
 }
 
-// Export helpers — Robot format: T and Sa/g only, no headers
-function exportTxt(data, filename) {
+// Export helpers — Robot format: T and Sa_g only, no headers
+function exportTxt(data: SpectrumBranchState | VerticalBranchState, filename: string) {
   const lines = data.pts.map(p =>
     p.T.toFixed(2).padEnd(10) + p.Sa_g.toFixed(6)
   )
@@ -108,16 +167,22 @@ function exportTxt(data, filename) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MAIN COMPONENT
+// PROPS & MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function SpectrumChart({ params, c, isDark }) {
+interface SpectrumChartProps {
+  params: GlobalParams;
+  c: AppColors;
+  isDark: boolean;
+}
+
+export default function SpectrumChart({ params, c, isDark: _isDark }: SpectrumChartProps) {
   // API state — one entry per direction + vertical
-  const [specX,    setSpecX]   = useState(null)  // Sad_x (or single)
-  const [specY,    setSpecY]   = useState(null)  // Sad_y (only if twoDir)
-  const [specV,    setSpecV]   = useState(null)  // Svd
-  const [loading,  setLoading] = useState(false)
-  const [apiErr,   setApiErr]  = useState(null)
+  const [specX,    setSpecX]   = useState<SpectrumState | null>(null)
+  const [specY,    setSpecY]   = useState<SpectrumState | null>(null)
+  const [specV,    setSpecV]   = useState<SpectrumState | null>(null)
+  const [loading,  setLoading] = useState<boolean>(false)
+  const [apiErr,   setApiErr]  = useState<string | null>(null)
 
   const zone   = params.zone === "0" ? "I" : params.zone
   const isZone0 = params.zone === "0"
@@ -126,7 +191,11 @@ export default function SpectrumChart({ params, c, isDark }) {
   useEffect(() => {
     const controller = new AbortController()
 
-    async function fetchOne(QF, R, setFn) {
+    async function fetchOne(
+      QF: number,
+      R: number,
+      setFn: (d: SpectrumState) => void,
+    ) {
       const res = await fetch("http://localhost:8000/api/v1/spectrum", {
         method : "POST",
         headers: { "Content-Type": "application/json" },
@@ -137,7 +206,7 @@ export default function SpectrumChart({ params, c, isDark }) {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({detail:`HTTP ${res.status}`}))
-        throw new Error(err.detail || `Erreur ${res.status}`)
+        throw new Error((err as {detail?:string}).detail || `Erreur ${res.status}`)
       }
       const data = await res.json()
       setFn({
@@ -179,11 +248,12 @@ export default function SpectrumChart({ params, c, isDark }) {
           ])
         }
       } catch (err) {
-        if (err.name !== "AbortError") {
-          const msg = err.message.toLowerCase()
+        const error = err as Error
+        if (error.name !== "AbortError") {
+          const msg = error.message.toLowerCase()
           setApiErr(msg.includes("failed to fetch") || msg.includes("network")
             ? "Backend non démarré — uvicorn backend.main:app --reload --port 8000"
-            : err.message
+            : error.message
           )
         }
       } finally {
@@ -198,10 +268,9 @@ export default function SpectrumChart({ params, c, isDark }) {
 
   const isT1 = TYPE1_ZONES.has(zone)
 
-  const EMPTY = { A:"—",I:"—",S:"—",T1:"—",T2:"—",T3:"—",peak:0,floor:0,pts:[] }
-  const hX = specX?.hData ?? EMPTY
-  const hY = specY?.hData ?? EMPTY
-  const vd = specV?.vData ?? {T1:"—",T2:"—",T3:"—",peak:0,floor:0,pts:[]}
+  const hX = specX?.hData ?? EMPTY_H
+  const hY = specY?.hData ?? EMPTY_H
+  const vd = specV?.vData ?? EMPTY_V
 
   return (
     <div style={{background:c.bg,minHeight:"100vh",color:c.text,
@@ -237,11 +306,11 @@ export default function SpectrumChart({ params, c, isDark }) {
           {l:"Groupe",  v:params.group,                  col:c.purple},
           ...(!params.twoDir
             ? [{l:"QF", v:params.QF.toFixed(2), col:c.amber},
-               {l:"R",  v:params.R,             col:c.red}]
+               {l:"R",  v:String(params.R),     col:c.red}]
             : [{l:"QFx", v:params.QFx.toFixed(2), col:c.blue},
-               {l:"Rx",  v:params.Rx,             col:c.blue},
+               {l:"Rx",  v:String(params.Rx),     col:c.blue},
                {l:"QFy", v:params.QFy.toFixed(2), col:c.purple},
-               {l:"Ry",  v:params.Ry,             col:c.purple}]
+               {l:"Ry",  v:String(params.Ry),     col:c.purple}]
           ),
         ].map(b => (
           <div key={b.l} style={{background:c.elevated,borderRadius:6,

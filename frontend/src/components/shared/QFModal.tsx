@@ -4,8 +4,17 @@
  * RPA 2024 §3.8 — Table 3.19
  */
 import { useState, useMemo } from "react"
+import type { AppColors } from "../../types"
 
-export const QF_CRITERIA = {
+// ── Static data ──────────────────────────────────────────────────────────────
+
+interface QfCriterion {
+  id: string;
+  label: string;
+  pq: number;
+}
+
+export const QF_CRITERIA: Record<string, QfCriterion[]> = {
   a:[
     {id:"a1", label:"Régularité en plan",             pq:0.05},
     {id:"a2", label:"Régularité en élévation",        pq:0.20},
@@ -19,12 +28,24 @@ export const QF_CRITERIA = {
   ],
   c:[],
 }
-export const QF_MAX = { a:1.35, b:1.30, c:1.0 }
-export const DEF_CHECKED = {a1:true,a2:true,a3:true,a4:true,b1:true,b2:true,b3:true}
+export const QF_MAX: Record<string, number> = { a:1.35, b:1.30, c:1.0 }
+export const DEF_CHECKED: Record<string, boolean> = {a1:true,a2:true,a3:true,a4:true,b1:true,b2:true,b3:true}
 
-export default function QFModal({ onClose, onValidate, initCat, initChecked, c }) {
-  const [cat, setCat]  = useState(initCat || "a")
-  const [chk, setChk]  = useState(initChecked || DEF_CHECKED)
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+interface QFModalProps {
+  onClose: () => void;
+  onValidate: (qf: number, cat: string, chk: Record<string, boolean>) => void;
+  initCat: string;
+  initChecked: Record<string, boolean>;
+  c: AppColors;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export default function QFModal({ onClose, onValidate, initCat, initChecked, c }: QFModalProps) {
+  const [cat, setCat]  = useState<string>(initCat || "a")
+  const [chk, setChk]  = useState<Record<string, boolean>>(initChecked || DEF_CHECKED)
   const criteria = QF_CRITERIA[cat]
 
   const qf = useMemo(() => {
@@ -34,9 +55,9 @@ export default function QFModal({ onClose, onValidate, initCat, initChecked, c }
     return +Math.min(t, QF_MAX[cat]).toFixed(2)
   }, [cat, chk, criteria])
 
-  function changeCat(c2) {
+  function changeCat(c2: string) {
     setCat(c2)
-    const r = {}
+    const r: Record<string, boolean> = {}
     QF_CRITERIA[c2].forEach(cr => { r[cr.id] = true })
     setChk(r)
   }

@@ -4,8 +4,25 @@
  * RPA 2024 §3.5 — Table 3.18
  */
 import { useState } from "react"
+import type { AppColors } from "../../types"
 
-export const SYSTEMS = [
+// ── Static data ──────────────────────────────────────────────────────────────
+
+interface ForceRatios {
+  ossature: number;
+  voiles: number;
+}
+
+export interface BracingSystem {
+  id: number;
+  label: string;
+  desc: string;
+  R: number;
+  qfCat: string;
+  detect: ((r: ForceRatios) => boolean) | null;
+}
+
+export const SYSTEMS: BracingSystem[] = [
   {
     id:1, label:"Système 1 — Ossature",
     desc:"Ossature (portiques). Vossature > 65% Vbase.",
@@ -44,24 +61,35 @@ export const SYSTEMS = [
   },
 ]
 
-export default function RModal({ onClose, onValidate, initSystem, c }) {
-  const [tab,    setTab]    = useState("manual")
-  const [selSys, setSelSys] = useState(initSystem || 1)
-  const [Voss,   setVoss]   = useState("")
-  const [Vvoi,   setVvoi]   = useState("")
-  const [Vtot,   setVtot]   = useState("")
-  const [detSys, setDetSys] = useState(null)
+// ── Props ─────────────────────────────────────────────────────────────────────
 
-  const activeSys = tab === "manual"
+interface RModalProps {
+  onClose: () => void;
+  onValidate: (r: number | undefined, sys: BracingSystem | null | undefined) => void;
+  initSystem: number;
+  c: AppColors;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export default function RModal({ onClose, onValidate, initSystem, c }: RModalProps) {
+  const [tab,    setTab]    = useState<string>("manual")
+  const [selSys, setSelSys] = useState<number>(initSystem || 1)
+  const [Voss,   setVoss]   = useState<string>("")
+  const [Vvoi,   setVvoi]   = useState<string>("")
+  const [Vtot,   setVtot]   = useState<string>("")
+  const [detSys, setDetSys] = useState<BracingSystem | null>(null)
+
+  const activeSys: BracingSystem | undefined | null = tab === "manual"
     ? SYSTEMS.find(s => s.id === selSys)
     : detSys
 
   function detectFromForces() {
     const vo = parseFloat(Voss), vv = parseFloat(Vvoi), vt = parseFloat(Vtot)
     if (isNaN(vt) || vt <= 0) return
-    const ratio = { ossature:(isNaN(vo)?0:vo)/vt, voiles:(isNaN(vv)?0:vv)/vt }
+    const ratio: ForceRatios = { ossature:(isNaN(vo)?0:vo)/vt, voiles:(isNaN(vv)?0:vv)/vt }
     const found = SYSTEMS.find(s => s.detect && s.detect(ratio))
-    setDetSys(found || null)
+    setDetSys(found ?? null)
   }
 
   return (
@@ -151,9 +179,9 @@ export default function RModal({ onClose, onValidate, initSystem, c }) {
             </div>
 
             <div style={{display:"flex",gap:10,marginBottom:12}}>
-              {[{label:"V ossature (kN)",val:Voss,set:setVoss},
+              {([{label:"V ossature (kN)",val:Voss,set:setVoss},
                 {label:"V voiles (kN)",  val:Vvoi,set:setVvoi},
-                {label:"V total (kN)",   val:Vtot,set:setVtot}].map(f => (
+                {label:"V total (kN)",   val:Vtot,set:setVtot}] as const).map(f => (
                 <div key={f.label} style={{flex:1}}>
                   <div style={{fontSize:11,color:c.textMuted,marginBottom:4}}>{f.label}</div>
                   <input type="number" min={0} value={f.val}

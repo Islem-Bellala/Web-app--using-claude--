@@ -10,13 +10,23 @@
  *   - Coefficient de majoration shown when 80% check fails
  */
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Cell, ResponsiveContainer,
 } from "recharts"
+import type { GlobalParams, AppColors, BaseShearResult, StoryForce } from "../../types"
 
-function ResultCard({ label, value, unit, accent, c }) {
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+interface ResultCardProps {
+  label: string;
+  value: string | number;
+  unit?: string;
+  accent: string;
+  c: AppColors;
+}
+function ResultCard({ label, value, unit, accent, c }: ResultCardProps) {
   return (
     <div style={{background:c.elevated,border:`1px solid ${accent}44`,
       borderRadius:10,padding:"10px 12px",flex:1,minWidth:90}}>
@@ -28,7 +38,12 @@ function ResultCard({ label, value, unit, accent, c }) {
   )
 }
 
-function ForceTooltip({ active, payload, c }) {
+interface ForceTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: StoryForce & { name: string } }>;
+  c: AppColors;
+}
+function ForceTooltip({ active, payload, c }: ForceTooltipProps) {
   if (!active||!payload?.length) return null
   const d = payload[0].payload
   return (
@@ -42,14 +57,20 @@ function ForceTooltip({ active, payload, c }) {
   )
 }
 
-function barColor(Fi, maxFi, c) {
+function barColor(Fi: number, maxFi: number, c: AppColors): string {
   const r = maxFi > 0 ? Fi/maxFi : 0
   if (r < 0.5) return c.blue
   if (r < 0.8) return c.amber
   return c.red
 }
 
-function Check80({ label, Vdyn, Vstat, c }) {
+interface Check80Props {
+  label: string;
+  Vdyn: number | null;
+  Vstat: number;
+  c: AppColors;
+}
+function Check80({ label, Vdyn, Vstat, c }: Check80Props) {
   if (!Vdyn || !Vstat) return (
     <div style={{fontSize:12,color:c.textMuted,fontStyle:"italic"}}>
       {label}: Vxd/Vyd non renseigné — vérification indisponible
@@ -91,7 +112,15 @@ function Check80({ label, Vdyn, Vstat, c }) {
 // DIRECTION RESULT PANEL
 // ─────────────────────────────────────────────────────────────────────────────
 
-function DirectionPanel({ dir, result, Vdyn, color, c }) {
+interface DirectionPanelProps {
+  dir: string;
+  result: BaseShearResult | null;
+  Vdyn: number | null;
+  color: string;
+  c: AppColors;
+}
+
+function DirectionPanel({ dir, result, Vdyn, color, c }: DirectionPanelProps) {
   if (!result) return null
   const maxFi = Math.max(...result.story_forces.map(s => s.Fi))
   const chartData = [...result.story_forces].reverse()
@@ -145,7 +174,7 @@ function DirectionPanel({ dir, result, Vdyn, color, c }) {
             margin={{top:0,right:45,bottom:0,left:52}}>
             <CartesianGrid stroke={c.border} strokeDasharray="4 4" horizontal={false}/>
             <XAxis type="number" tick={{fill:c.textSec,fontSize:10}}
-              tickFormatter={v => v.toFixed(0)}/>
+              tickFormatter={(v: number) => v.toFixed(0)}/>
             <YAxis type="category" dataKey="name" tick={{fill:c.textSec,fontSize:10}} width={48}/>
             <Tooltip content={<ForceTooltip c={c}/>}/>
             <Bar dataKey="Fi" radius={[0,4,4,0]}>
@@ -168,7 +197,7 @@ function DirectionPanel({ dir, result, Vdyn, color, c }) {
                   color:c.textSec,fontWeight:600,fontSize:10,
                   letterSpacing:"0.05em",textTransform:"uppercase",
                   borderBottom:`1px solid ${c.border}`,
-                  ...(h==="Niveau"?{textAlign:"left"}:{})}}>
+                  ...(h==="Niveau"?{textAlign:"left" as const}:{})}}>
                   {h}
                 </th>
               ))}
@@ -203,14 +232,19 @@ function DirectionPanel({ dir, result, Vdyn, color, c }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MAIN COMPONENT
+// PROPS & MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function BaseShearPage({ params, c }) {
-  const [resultX, setResultX] = useState(null)
-  const [resultY, setResultY] = useState(null)
-  const [loading,  setLoading] = useState(false)
-  const [apiErr,   setApiErr]  = useState(null)
+interface BaseShearPageProps {
+  params: GlobalParams;
+  c: AppColors;
+}
+
+export default function BaseShearPage({ params, c }: BaseShearPageProps) {
+  const [resultX, setResultX] = useState<BaseShearResult | null>(null)
+  const [resultY, setResultY] = useState<BaseShearResult | null>(null)
+  const [loading,  setLoading] = useState<boolean>(false)
+  const [apiErr,   setApiErr]  = useState<string | null>(null)
 
   // Prepare stories payload
   function storiesPayload() {
@@ -220,16 +254,14 @@ export default function BaseShearPage({ params, c }) {
       .sort((a,b) => a.elevation-b.elevation)
   }
 
-  function isReady() {
+  function isReady(): boolean {
     const sp = storiesPayload()
     return sp.length >= 1 && parseFloat(params.stories.map(s => s.elevation).filter(Boolean).slice(-1)[0]) > 0
   }
 
-  async function fetchDirection(QF, R, TCalc) {
+  async function fetchDirection(QF: number, R: number, TCalc: string): Promise<BaseShearResult> {
     const sp = storiesPayload()
     const hn = Math.max(...sp.map(s => s.elevation))
-    const W  = sp.reduce((a,s) => a+s.weight, 0)
-
     const res = await fetch("http://localhost:8000/api/v1/base_shear", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
@@ -246,9 +278,9 @@ export default function BaseShearPage({ params, c }) {
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({detail:`HTTP ${res.status}`}))
-      throw new Error(err.detail || `Erreur ${res.status}`)
+      throw new Error((err as {detail?:string}).detail || `Erreur ${res.status}`)
     }
-    return res.json()
+    return res.json() as Promise<BaseShearResult>
   }
 
   async function calculate() {
@@ -271,10 +303,11 @@ export default function BaseShearPage({ params, c }) {
       setResultX(rX)
       setResultY(rY)
     } catch (err) {
-      const msg = err.message.toLowerCase()
+      const error = err as Error
+      const msg = error.message.toLowerCase()
       setApiErr(msg.includes("failed to fetch") || msg.includes("network")
         ? "Backend non démarré — uvicorn backend.main:app --reload --port 8000"
-        : err.message
+        : error.message
       )
     } finally {
       setLoading(false)
@@ -313,11 +346,11 @@ export default function BaseShearPage({ params, c }) {
           {l:"Site",  v:params.site,  col:c.green},
           {l:"Groupe",v:params.group, col:c.purple},
           ...(!params.twoDir
-            ? [{l:"QF",v:params.QF.toFixed(2),col:c.amber},{l:"R",v:params.R,col:c.red}]
-            : [{l:"QFx",v:params.QFx.toFixed(2),col:c.blue},{l:"Rx",v:params.Rx,col:c.blue},
-               {l:"QFy",v:params.QFy.toFixed(2),col:c.purple},{l:"Ry",v:params.Ry,col:c.purple}]
+            ? [{l:"QF",v:params.QF.toFixed(2),col:c.amber},{l:"R",v:String(params.R),col:c.red}]
+            : [{l:"QFx",v:params.QFx.toFixed(2),col:c.blue},{l:"Rx",v:String(params.Rx),col:c.blue},
+               {l:"QFy",v:params.QFy.toFixed(2),col:c.purple},{l:"Ry",v:String(params.Ry),col:c.purple}]
           ),
-          {l:"Niveaux", v:params.stories.length, col:c.textSec},
+          {l:"Niveaux", v:String(params.stories.length), col:c.textSec},
           {l:"W", v:`${params.stories.reduce((a,s)=>a+(parseFloat(s.weight)||0),0).toFixed(0)} kN`, col:c.green},
           ...(params.Tx ? [{l:"Tx",v:`${params.Tx}s`,col:c.blue}] : []),
           ...(params.Ty ? [{l:"Ty",v:`${params.Ty}s`,col:c.purple}] : []),
