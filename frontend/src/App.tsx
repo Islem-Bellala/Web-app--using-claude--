@@ -1,13 +1,14 @@
 /**
- * StructCalc — Main Application (Session 8)
- * Global params state lives here and flows down to every page.
+ * StructCalc — Main Application (Phase 3)
+ * App.tsx is now layout + routing only.
+ * All state lives in Zustand stores.
  */
 
-import { useState } from 'react'
-import SpectrumChart  from './components/seismic/SpectrumChart'
-import BaseShearPage  from './components/seismic/BaseShearPage'
-import ProjectParams  from './components/general/ProjectParams'
-import type { AppColors, GlobalParams } from './types'
+import SpectrumChart from './components/seismic/SpectrumChart'
+import BaseShearPage from './components/seismic/BaseShearPage'
+import ProjectParams from './components/general/ProjectParams'
+import type { AppColors } from './types'
+import { useUIStore } from './stores'
 
 const DARK: AppColors = {
   bg:'#020817', surface:'#0a1628', elevated:'#0f172a',
@@ -67,56 +68,6 @@ const NAV: NavGroup[] = [
     ]
   },
 ]
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DEFAULT GLOBAL PARAMS — used by all pages
-// ─────────────────────────────────────────────────────────────────────────────
-const today = new Date().toISOString().split('T')[0]
-
-const DEFAULT_PARAMS: GlobalParams = {
-  // Block 1 — Identification
-  projectName: '',
-  engineer:    '',
-  reference:   '',
-  date:        today,
-
-  // Block 2 — Seismic
-  wilayaCode: '09',       // Blida -> Zone VI
-  commune:    '',
-  zone:       'VI',       // derived from wilaya
-  site:       'S2',
-  group:      '2',
-  twoDir:     false,      // single direction for spectrum
-
-  // Single direction
-  QF:      1.0,
-  R:       4.5,
-  selSys:  1,
-  qfCat:   'a',
-  qfChk:   {a1:true,a2:true,a3:true,a4:true,b1:true,b2:true,b3:true},
-
-  // Two directions
-  QFx:     1.0,  Rx:  4.5,  selSysX: 1, qfCatX: 'a',
-  QFy:     1.0,  Ry:  4.5,  selSysY: 1, qfCatY: 'a',
-  qfChkX:  {a1:true,a2:true,a3:true,a4:true,b1:true,b2:true,b3:true},
-  qfChkY:  {a1:true,a2:true,a3:true,a4:true,b1:true,b2:true,b3:true},
-
-  frameSys: 'ba_with_infill',
-
-  // Block 3 — Geometry
-  stories: [
-    {id:1, name:'RDC',     elevation:'3.0',  weight:'1200', drx:'', dry:''},
-    {id:2, name:'Etage 1', elevation:'6.0',  weight:'1100', drx:'', dry:''},
-    {id:3, name:'Etage 2', elevation:'9.0',  weight:'1100', drx:'', dry:''},
-    {id:4, name:'Etage 3', elevation:'12.0', weight:'900',  drx:'', dry:''},
-  ],
-
-  // Block 4 — Dynamic analysis results
-  Tx:  '',
-  Ty:  '',
-  Vxd: '',
-  Vyd: '',
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SUB-COMPONENTS
@@ -221,21 +172,20 @@ function ComingSoon({ c }: { c: AppColors }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// APP
+// APP — layout + routing only
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [isDark,      setIsDark]      = useState<boolean>(false)
-  const [activePage,  setActivePage]  = useState<string>('params')
-  const [params,      setParams]      = useState<GlobalParams>(DEFAULT_PARAMS)
+  const { theme, activePage, setActivePage, toggleTheme } = useUIStore()
 
+  const isDark = theme === 'dark'
   const c: AppColors = isDark ? DARK : LIGHT
 
   function renderPage() {
     switch (activePage) {
-      case 'params':     return <ProjectParams params={params} setParams={setParams} c={c} />
-      case 'spectrum':   return <SpectrumChart  params={params} c={c} isDark={isDark} />
-      case 'base_shear': return <BaseShearPage  params={params} c={c} />
+      case 'params':     return <ProjectParams c={c} />
+      case 'spectrum':   return <SpectrumChart  c={c} isDark={isDark} />
+      case 'base_shear': return <BaseShearPage  c={c} />
       default:           return <ComingSoon c={c} />
     }
   }
@@ -247,7 +197,7 @@ export default function App() {
         onNavigate={setActivePage}
         c={c}
         isDark={isDark}
-        onToggleTheme={() => setIsDark(d => !d)}
+        onToggleTheme={toggleTheme}
       />
       <main style={{ flex:1, overflowY:'auto', background:c.bg, transition:'background 0.2s' }}>
         {renderPage()}

@@ -1,6 +1,6 @@
 /**
- * StructCalc — Paramètres Généraux
- * Central input hub — fills once, used by all verification modules.
+ * StructCalc — Paramètres Généraux (Phase 3)
+ * Reads from Zustand stores — no more props drilling.
  *
  * Block 1 — Identification          (facultatif, auto-generated)
  * Block 2 — Paramètres sismiques    (wilaya -> zone, site, groupe, QF, R)
@@ -11,7 +11,8 @@
 import { useState } from "react"
 import QFModal, { DEF_CHECKED } from "../shared/QFModal"
 import RModal, { type BracingSystem } from "../shared/RModal"
-import type { GlobalParams, AppColors } from "../../types"
+import type { AppColors } from "../../types"
+import { useProjectStore, useSeismicStore, useStructuralStore } from "../../stores"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WILAYA DATA — RPA 2024 Annex A
@@ -194,12 +195,10 @@ function DirButton({ label, active, color, onClick, c }: DirButtonProps) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PROPS
+// PROPS — only c (AppColors) needed now; all data comes from stores
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ProjectParamsProps {
-  params: GlobalParams;
-  setParams: React.Dispatch<React.SetStateAction<GlobalParams>>;
   c: AppColors;
 }
 
@@ -207,14 +206,19 @@ interface ProjectParamsProps {
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function ProjectParams({ params, setParams, c }: ProjectParamsProps) {
+export default function ProjectParams({ c }: ProjectParamsProps) {
+  // Stores
+  const project    = useProjectStore()
+  const seismic    = useSeismicStore()
+  const structural = useStructuralStore()
+
   // Modal visibility — null | "single" | "x" | "y"
-  const [showQF,  setShowQF]  = useState<string | null>(null)
-  const [showR,   setShowR]   = useState<string | null>(null)
+  const [showQF, setShowQF] = useState<string | null>(null)
+  const [showR,  setShowR]  = useState<string | null>(null)
 
   // Derive zone from wilaya + commune
-  const wilaya      = WILAYAS.find(w => w.code === params.wilayaCode) ?? WILAYAS[8]
-  const communeData = WILAYA_COMMUNES[params.wilayaCode]
+  const wilaya      = WILAYAS.find(w => w.code === project.wilayaCode) ?? WILAYAS[8]
+  const communeData = WILAYA_COMMUNES[project.wilayaCode]
   const hasCommunes = !!(communeData && communeData.communes.length > 0)
 
   function deriveZone(code: string, commune: string): string {
@@ -225,66 +229,46 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
     return found ? found.zone : cd.defaultZone
   }
 
-  function update<K extends keyof GlobalParams>(key: K, val: GlobalParams[K]) {
-    setParams(p => ({...p, [key]:val}))
-  }
-
   function handleWilayaChange(code: string) {
     const newZone = deriveZone(code, "")
-    setParams(p => ({...p, wilayaCode:code, commune:"", zone:newZone}))
+    project.setWilaya(code)
+    project.setCommune("")
+    project.setZone(newZone)
   }
 
   function handleCommuneChange(commune: string) {
-    const newZone = deriveZone(params.wilayaCode, commune)
-    setParams(p => ({...p, commune, zone:newZone}))
+    const newZone = deriveZone(project.wilayaCode, commune)
+    project.setCommune(commune)
+    project.setZone(newZone)
   }
 
   // QF modal helpers
   function handleQFValidate(qf: number, cat: string, chk: Record<string, boolean>) {
-    if (showQF === "x")      setParams(p => ({...p, QFx:qf, qfCatX:cat, qfChkX:chk}))
-    else if (showQF === "y") setParams(p => ({...p, QFy:qf, qfCatY:cat, qfChkY:chk}))
-    else                     setParams(p => ({...p, QF:qf,  qfCat:cat,  qfChk:chk}))
+    if (showQF === "x")      seismic.setQFParams({ QFx: qf, qfCatX: cat, qfChkX: chk })
+    else if (showQF === "y") seismic.setQFParams({ QFy: qf, qfCatY: cat, qfChkY: chk })
+    else                     seismic.setQFParams({ QF: qf, qfCat: cat, qfChk: chk })
     setShowQF(null)
   }
 
   // R modal helpers
   function handleRValidate(r: number | undefined, sys: BracingSystem | null | undefined) {
-    if (showR === "x")      setParams(p => ({...p, Rx:r??p.Rx, selSysX:sys?.id??1, qfCatX:sys?.qfCat??"a"}))
-    else if (showR === "y") setParams(p => ({...p, Ry:r??p.Ry, selSysY:sys?.id??1, qfCatY:sys?.qfCat??"a"}))
-    else                    setParams(p => ({...p, R:r??p.R,   selSys:sys?.id??1,  qfCat:sys?.qfCat??"a"}))
+    if (showR === "x") {
+      seismic.setRParams({ Rx: r ?? seismic.Rx, selSysX: sys?.id ?? 1 })
+      seismic.setField('qfCatX', sys?.qfCat ?? 'a')
+    } else if (showR === "y") {
+      seismic.setRParams({ Ry: r ?? seismic.Ry, selSysY: sys?.id ?? 1 })
+      seismic.setField('qfCatY', sys?.qfCat ?? 'a')
+    } else {
+      seismic.setRParams({ R: r ?? seismic.R, selSys: sys?.id ?? 1 })
+      seismic.setField('qfCat', sys?.qfCat ?? 'a')
+    }
     setShowR(null)
   }
 
-  // Storey table
-  function addStorey() {
-    const last = params.stories[params.stories.length - 1]
-    const lastElev = parseFloat(last?.elevation) || 0
-    const step = params.stories.length >= 2
-      ? parseFloat(last.elevation) - parseFloat(params.stories[params.stories.length-2].elevation)
-      : 3.0
-    const newStorey = {
-      id: Date.now(),
-      name: `Etage ${params.stories.length}`,
-      elevation: (lastElev + step).toFixed(1),
-      weight: last?.weight || "1000",
-      drx:"", dry:"",
-    }
-    setParams(p => ({...p, stories:[...p.stories, newStorey]}))
-  }
-
-  function removeStorey(id: number) {
-    if (params.stories.length <= 1) return
-    setParams(p => ({...p, stories:p.stories.filter(s => s.id !== id)}))
-  }
-
-  function updateStorey(id: number, field: string, val: string) {
-    setParams(p => ({...p, stories:p.stories.map(s => s.id===id ? {...s,[field]:val} : s)}))
-  }
-
-  const isZone0 = params.zone === "0"
-  const totalW  = params.stories.reduce((a,s) => a+(parseFloat(s.weight)||0), 0)
-  const hn      = params.stories.length
-    ? Math.max(...params.stories.map(s => parseFloat(s.elevation)||0))
+  const isZone0 = project.zone === "0"
+  const totalW  = structural.stories.reduce((a, s) => a + (parseFloat(s.weight) || 0), 0)
+  const hn      = structural.stories.length
+    ? Math.max(...structural.stories.map(s => parseFloat(s.elevation) || 0))
     : 0
 
   const inputStyle: React.CSSProperties = {background:c.elevated,border:`1px solid ${c.border}`,
@@ -298,8 +282,8 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
       {/* QF Modals */}
       {showQF && (
         <QFModal c={c}
-          initCat={showQF==="x" ? params.qfCatX : showQF==="y" ? params.qfCatY : params.qfCat}
-          initChecked={showQF==="x" ? params.qfChkX : showQF==="y" ? params.qfChkY : params.qfChk}
+          initCat={showQF==="x" ? seismic.qfCatX : showQF==="y" ? seismic.qfCatY : seismic.qfCat}
+          initChecked={showQF==="x" ? seismic.qfChkX : showQF==="y" ? seismic.qfChkY : seismic.qfChk}
           onClose={() => setShowQF(null)}
           onValidate={handleQFValidate}/>
       )}
@@ -307,7 +291,7 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
       {/* R Modals */}
       {showR && (
         <RModal c={c}
-          initSystem={showR==="x" ? params.selSysX : showR==="y" ? params.selSysY : params.selSys}
+          initSystem={showR==="x" ? seismic.selSysX : showR==="y" ? seismic.selSysY : seismic.selSys}
           onClose={() => setShowR(null)}
           onValidate={handleRValidate}/>
       )}
@@ -339,24 +323,24 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
             </div>
 
             <Field label="Nom du projet" c={c}>
-              <TextInput value={params.projectName}
-                onChange={v => update("projectName",v)}
-                placeholder={`Projet_${params.date}`} c={c}/>
+              <TextInput value={project.projectName}
+                onChange={v => project.setProjectMeta({ projectName: v })}
+                placeholder={`Projet_${project.date}`} c={c}/>
             </Field>
             <Field label="Ingénieur" c={c}>
-              <TextInput value={params.engineer}
-                onChange={v => update("engineer",v)}
+              <TextInput value={project.engineer}
+                onChange={v => project.setProjectMeta({ engineer: v })}
                 placeholder="Nom de l'ingénieur" c={c}/>
             </Field>
             <Field label="Référence" c={c}>
-              <TextInput value={params.reference}
-                onChange={v => update("reference",v)}
+              <TextInput value={project.reference}
+                onChange={v => project.setProjectMeta({ reference: v })}
                 placeholder="Réf. dossier" c={c}/>
             </Field>
             <Field label="Date" c={c}>
               <div style={{background:c.elevated,border:`1px solid ${c.border}`,
                 borderRadius:8,padding:"8px 10px",fontSize:13,color:c.textMuted}}>
-                {params.date}
+                {project.date}
               </div>
             </Field>
           </div>
@@ -367,7 +351,7 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
 
             {/* Wilaya */}
             <Field label="Wilaya" c={c}>
-              <select value={params.wilayaCode} onChange={e => handleWilayaChange(e.target.value)}
+              <select value={project.wilayaCode} onChange={e => handleWilayaChange(e.target.value)}
                 style={inputStyle}>
                 {WILAYAS.map(w => (
                   <option key={w.code} value={w.code}>{w.code} — {w.name}</option>
@@ -378,7 +362,7 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
             {/* Commune — only if split wilaya */}
             {wilaya.split && hasCommunes && (
               <Field label="Commune" c={c}>
-                <select value={params.commune} onChange={e => handleCommuneChange(e.target.value)}
+                <select value={project.commune} onChange={e => handleCommuneChange(e.target.value)}
                   style={{...inputStyle,border:`1px solid ${c.amber}66`}}>
                   <option value="">— Autre commune (Zone {communeData?.defaultZone || wilaya.zone})</option>
                   {[...communeData.communes]
@@ -404,7 +388,7 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
               <div style={{fontSize:10,color:c.textMuted,marginBottom:2,
                 textTransform:"uppercase",letterSpacing:"0.06em"}}>Zone sismique</div>
               <div style={{fontSize:14,fontWeight:700,color:isZone0 ? c.amber : c.blue}}>
-                {ZONE_LABELS[params.zone] || params.zone}
+                {ZONE_LABELS[project.zone] || project.zone}
               </div>
             </div>
 
@@ -412,12 +396,12 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
             <Field label="Classe de site" c={c}>
               <div style={{display:"flex",gap:5}}>
                 {["S1","S2","S3","S4"].map(s => (
-                  <button type="button" key={s} onClick={() => update("site",s)} style={{
+                  <button type="button" key={s} onClick={() => project.setSite(s)} style={{
                     flex:1,padding:"6px 0",borderRadius:7,cursor:"pointer",
-                    border:`1px solid ${params.site===s ? c.green : c.border}`,
-                    background:params.site===s ? c.green+"22" : c.elevated,
-                    color:params.site===s ? c.green : c.textSec,
-                    fontSize:12,fontWeight:params.site===s ? 700 : 400}}>
+                    border:`1px solid ${project.site===s ? c.green : c.border}`,
+                    background:project.site===s ? c.green+"22" : c.elevated,
+                    color:project.site===s ? c.green : c.textSec,
+                    fontSize:12,fontWeight:project.site===s ? 700 : 400}}>
                     {s}
                   </button>
                 ))}
@@ -426,7 +410,7 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
 
             {/* Importance group */}
             <Field label="Groupe d'importance" c={c}>
-              <select value={params.group} onChange={e => update("group",e.target.value)}
+              <select value={project.group} onChange={e => project.setGroup(e.target.value)}
                 style={inputStyle}>
                 <option value="1A">Groupe 1A — I=1.4</option>
                 <option value="1B">Groupe 1B — I=1.2</option>
@@ -438,22 +422,22 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
             {/* Direction toggle */}
             <Field label="Directions d'analyse (spectre)" c={c}>
               <div style={{display:"flex",gap:6}}>
-                <DirButton label="Direction unique" active={!params.twoDir}
-                  color={c.blue} onClick={() => update("twoDir",false)} c={c}/>
-                <DirButton label="X et Y séparées" active={params.twoDir}
-                  color={c.purple} onClick={() => update("twoDir",true)} c={c}/>
+                <DirButton label="Direction unique" active={!seismic.twoDir}
+                  color={c.blue} onClick={() => seismic.setTwoDir(false)} c={c}/>
+                <DirButton label="X et Y séparées" active={seismic.twoDir}
+                  color={c.purple} onClick={() => seismic.setTwoDir(true)} c={c}/>
               </div>
             </Field>
 
             {/* QF and R — single or double */}
-            {!params.twoDir ? (
+            {!seismic.twoDir ? (
               <>
                 <Field label="Facteur qualité QF" c={c}>
                   <button type="button" onClick={() => setShowQF("single")} style={{
                     width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
                     padding:"9px 11px",borderRadius:8,cursor:"pointer",
                     background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:13}}>
-                    <span>Q<sub>F</sub> = <b style={{color:c.amber}}>{params.QF.toFixed(2)}</b></span>
+                    <span>Q<sub>F</sub> = <b style={{color:c.amber}}>{seismic.QF.toFixed(2)}</b></span>
                     <span style={{fontSize:12,color:c.blue}}>Calculer →</span>
                   </button>
                 </Field>
@@ -462,11 +446,11 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
                     width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
                     padding:"9px 11px",borderRadius:8,cursor:"pointer",
                     background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:13}}>
-                    <span>R = <b style={{color:c.red}}>{params.R}</b></span>
+                    <span>R = <b style={{color:c.red}}>{seismic.R}</b></span>
                     <span style={{fontSize:12,color:c.blue}}>Identifier →</span>
                   </button>
                   <div style={{fontSize:11,color:c.textSec,marginTop:4,paddingLeft:2}}>
-                    Syst. {params.selSys} · Cat. Q<sub>F</sub> ({params.qfCat})
+                    Syst. {seismic.selSys} · Cat. Q<sub>F</sub> ({seismic.qfCat})
                   </div>
                 </Field>
               </>
@@ -481,14 +465,14 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
                     width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
                     padding:"8px 10px",borderRadius:7,cursor:"pointer",
                     background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12,marginBottom:6}}>
-                    <span>Q<sub>Fx</sub> = <b style={{color:c.amber}}>{params.QFx.toFixed(2)}</b></span>
+                    <span>Q<sub>Fx</sub> = <b style={{color:c.amber}}>{seismic.QFx.toFixed(2)}</b></span>
                     <span style={{fontSize:11,color:c.blue}}>Calculer →</span>
                   </button>
                   <button type="button" onClick={() => setShowR("x")} style={{
                     width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
                     padding:"8px 10px",borderRadius:7,cursor:"pointer",
                     background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12}}>
-                    <span>Rx = <b style={{color:c.red}}>{params.Rx}</b></span>
+                    <span>Rx = <b style={{color:c.red}}>{seismic.Rx}</b></span>
                     <span style={{fontSize:11,color:c.blue}}>Identifier →</span>
                   </button>
                 </div>
@@ -501,14 +485,14 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
                     width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
                     padding:"8px 10px",borderRadius:7,cursor:"pointer",
                     background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12,marginBottom:6}}>
-                    <span>Q<sub>Fy</sub> = <b style={{color:c.amber}}>{params.QFy.toFixed(2)}</b></span>
+                    <span>Q<sub>Fy</sub> = <b style={{color:c.amber}}>{seismic.QFy.toFixed(2)}</b></span>
                     <span style={{fontSize:11,color:c.blue}}>Calculer →</span>
                   </button>
                   <button type="button" onClick={() => setShowR("y")} style={{
                     width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
                     padding:"8px 10px",borderRadius:7,cursor:"pointer",
                     background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12}}>
-                    <span>Ry = <b style={{color:c.red}}>{params.Ry}</b></span>
+                    <span>Ry = <b style={{color:c.red}}>{seismic.Ry}</b></span>
                     <span style={{fontSize:11,color:c.blue}}>Identifier →</span>
                   </button>
                 </div>
@@ -517,7 +501,7 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
 
             {/* Structural system for period */}
             <Field label="Système pour période T (CT)" c={c}>
-              <select value={params.frameSys} onChange={e => update("frameSys",e.target.value)}
+              <select value={seismic.frameSys} onChange={e => seismic.setField('frameSys', e.target.value)}
                 style={inputStyle}>
                 {FRAME_SYSTEMS.map(f => (
                   <option key={f.v} value={f.v}>{f.ct} — {f.l.split(" ").slice(0,4).join(" ")}</option>
@@ -544,30 +528,30 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
             {/* Storey rows */}
             <div style={{display:"flex",flexDirection:"column",gap:5,
               maxHeight:340,overflowY:"auto",marginBottom:10}}>
-              {params.stories.map(s => (
+              {structural.stories.map(s => (
                 <div key={s.id} style={{display:"grid",
                   gridTemplateColumns:"1fr 65px 75px 28px",gap:6,alignItems:"center"}}>
                   <input value={s.name}
-                    onChange={e => updateStorey(s.id,"name",e.target.value)}
+                    onChange={e => structural.updateStory(s.id, "name", e.target.value)}
                     style={{background:c.elevated,border:`1px solid ${c.border}`,
                       borderRadius:6,padding:"6px 7px",color:c.text,fontSize:12,
                       outline:"none",width:"100%"}}/>
                   <input type="number" value={s.elevation} min={0} step={0.5}
-                    onChange={e => updateStorey(s.id,"elevation",e.target.value)}
+                    onChange={e => structural.updateStory(s.id, "elevation", e.target.value)}
                     style={{background:c.elevated,border:`1px solid ${c.border}`,
                       borderRadius:6,padding:"6px 7px",color:c.purple,
                       fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
                   <input type="number" value={s.weight} min={0}
-                    onChange={e => updateStorey(s.id,"weight",e.target.value)}
+                    onChange={e => structural.updateStory(s.id, "weight", e.target.value)}
                     style={{background:c.elevated,border:`1px solid ${c.border}`,
                       borderRadius:6,padding:"6px 7px",color:c.green,
                       fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
-                  <button type="button" onClick={() => removeStorey(s.id)}
-                    disabled={params.stories.length<=1}
+                  <button type="button" onClick={() => structural.removeStory(s.id)}
+                    disabled={structural.stories.length<=1}
                     style={{width:24,height:24,borderRadius:5,cursor:"pointer",
-                      background:params.stories.length>1 ? c.red+"22" : "transparent",
-                      border:params.stories.length>1 ? `1px solid ${c.red}44` : "1px solid transparent",
-                      color:params.stories.length>1 ? c.red : c.textMuted,
+                      background:structural.stories.length>1 ? c.red+"22" : "transparent",
+                      border:structural.stories.length>1 ? `1px solid ${c.red}44` : "1px solid transparent",
+                      color:structural.stories.length>1 ? c.red : c.textMuted,
                       fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>
                     ×
                   </button>
@@ -575,7 +559,7 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
               ))}
             </div>
 
-            <button type="button" onClick={addStorey} style={{
+            <button type="button" onClick={() => structural.addStory()} style={{
               width:"100%",padding:"7px",borderRadius:7,cursor:"pointer",
               background:c.green+"22",border:`1px solid ${c.green}44`,
               color:c.green,fontSize:12,fontWeight:600,marginBottom:10}}>
@@ -621,19 +605,19 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
             {/* Periods and dynamic shear */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
               {([
-                {label:"Période Tx (s)",key:"Tx" as const,color:c.blue},
-                {label:"Période Ty (s)",key:"Ty" as const,color:c.purple},
-                {label:"Effort dyn. Vxd (kN)",key:"Vxd" as const,color:c.blue},
-                {label:"Effort dyn. Vyd (kN)",key:"Vyd" as const,color:c.purple},
+                {label:"Période Tx (s)",      key:"Tx"  as const, color:c.blue,   val:seismic.Tx},
+                {label:"Période Ty (s)",      key:"Ty"  as const, color:c.purple, val:seismic.Ty},
+                {label:"Effort dyn. Vxd (kN)",key:"Vxd" as const, color:c.blue,   val:seismic.Vxd},
+                {label:"Effort dyn. Vyd (kN)",key:"Vyd" as const, color:c.purple, val:seismic.Vyd},
               ]).map(f => (
                 <div key={f.key}>
                   <label style={{fontSize:11,color:c.textSec,display:"block",
                     textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,marginBottom:4}}>
                     {f.label}
                   </label>
-                  <input type="number" value={params[f.key]} step="0.01" min={0}
+                  <input type="number" value={f.val} step="0.01" min={0}
                     placeholder="—"
-                    onChange={e => update(f.key, e.target.value)}
+                    onChange={e => seismic.setField(f.key, e.target.value)}
                     style={{width:"100%",background:c.elevated,border:`1px solid ${f.color}44`,
                       borderRadius:8,padding:"8px 10px",color:f.color,
                       fontSize:14,fontFamily:"monospace",outline:"none"}}/>
@@ -654,18 +638,18 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
               ))}
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:200,overflowY:"auto"}}>
-              {params.stories.map(s => (
+              {structural.stories.map(s => (
                 <div key={s.id} style={{display:"grid",gridTemplateColumns:"1fr 80px 80px",gap:6,alignItems:"center"}}>
                   <div style={{fontSize:12,color:c.textSec,padding:"4px 0"}}>{s.name}</div>
                   <input type="number" value={s.drx||""} step="0.001" min={0}
                     placeholder="—"
-                    onChange={e => updateStorey(s.id,"drx",e.target.value)}
+                    onChange={e => structural.updateStory(s.id, "drx", e.target.value)}
                     style={{background:c.elevated,border:`1px solid ${c.blue}44`,
                       borderRadius:6,padding:"5px 7px",color:c.blue,
                       fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
                   <input type="number" value={s.dry||""} step="0.001" min={0}
                     placeholder="—"
-                    onChange={e => updateStorey(s.id,"dry",e.target.value)}
+                    onChange={e => structural.updateStory(s.id, "dry", e.target.value)}
                     style={{background:c.elevated,border:`1px solid ${c.purple}44`,
                       borderRadius:6,padding:"5px 7px",color:c.purple,
                       fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
@@ -680,10 +664,10 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
                 Données disponibles
               </div>
               {[
-                {label:"Périodes Tx/Ty",     ok:!!(params.Tx && params.Ty)},
-                {label:"Efforts Vxd/Vyd",    ok:!!(params.Vxd && params.Vyd)},
-                {label:"Déplacements drx",   ok:params.stories.some(s => s.drx)},
-                {label:"Déplacements dry",   ok:params.stories.some(s => s.dry)},
+                {label:"Périodes Tx/Ty",     ok:!!(seismic.Tx && seismic.Ty)},
+                {label:"Efforts Vxd/Vyd",    ok:!!(seismic.Vxd && seismic.Vyd)},
+                {label:"Déplacements drx",   ok:structural.stories.some(s => s.drx)},
+                {label:"Déplacements dry",   ok:structural.stories.some(s => s.dry)},
               ].map(item => (
                 <div key={item.label} style={{display:"flex",alignItems:"center",gap:8,
                   fontSize:12,color:item.ok ? c.green : c.textMuted,marginBottom:3}}>
@@ -694,6 +678,7 @@ export default function ProjectParams({ params, setParams, c }: ProjectParamsPro
             </div>
           </div>
         </div>
+
       </div>
     </div>
   )

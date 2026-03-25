@@ -1,11 +1,6 @@
 /**
- * StructCalc — RPA 2024 Spectrum Visualizer (Session 8)
- *
- * Changes from Session 6:
- *   - All seismic parameters now come from `params` prop (Paramètres généraux)
- *   - No input panel — parameters are set in ProjectParams
- *   - If params.twoDir: shows separate Sad_x and Sad_y charts
- *   - Wilaya/commune/zone selection removed (lives in ProjectParams)
+ * StructCalc — RPA 2024 Spectrum Visualizer (Phase 3)
+ * Reads seismic parameters from Zustand stores — no more props drilling.
  *
  * Code references:
  *   RPA 2024 §3.3.3 Eq.3.15 — horizontal design spectrum
@@ -17,7 +12,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ReferenceLine, ResponsiveContainer,
 } from "recharts"
-import type { GlobalParams, AppColors, SpectrumPoint } from "../../types"
+import type { AppColors, SpectrumPoint } from "../../types"
+import { useProjectStore, useSeismicStore } from "../../stores"
 
 // ── Local types for spectrum state ──────────────────────────────────────────
 
@@ -171,12 +167,15 @@ function exportTxt(data: SpectrumBranchState | VerticalBranchState, filename: st
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface SpectrumChartProps {
-  params: GlobalParams;
   c: AppColors;
   isDark: boolean;
 }
 
-export default function SpectrumChart({ params, c, isDark: _isDark }: SpectrumChartProps) {
+export default function SpectrumChart({ c, isDark: _isDark }: SpectrumChartProps) {
+  // Read from stores
+  const project = useProjectStore()
+  const seismic = useSeismicStore()
+
   // API state — one entry per direction + vertical
   const [specX,    setSpecX]   = useState<SpectrumState | null>(null)
   const [specY,    setSpecY]   = useState<SpectrumState | null>(null)
@@ -184,8 +183,8 @@ export default function SpectrumChart({ params, c, isDark: _isDark }: SpectrumCh
   const [loading,  setLoading] = useState<boolean>(false)
   const [apiErr,   setApiErr]  = useState<string | null>(null)
 
-  const zone   = params.zone === "0" ? "I" : params.zone
-  const isZone0 = params.zone === "0"
+  const zone    = project.zone === "0" ? "I" : project.zone
+  const isZone0 = project.zone === "0"
 
   // Fetch spectrum from backend whenever relevant params change
   useEffect(() => {
@@ -200,7 +199,7 @@ export default function SpectrumChart({ params, c, isDark: _isDark }: SpectrumCh
         method : "POST",
         headers: { "Content-Type": "application/json" },
         body   : JSON.stringify({
-          zone, site_class:params.site, importance_group:params.group, QF, R, T_step:0.01
+          zone, site_class: project.site, importance_group: project.group, QF, R, T_step: 0.01
         }),
         signal: controller.signal,
       })
@@ -230,20 +229,18 @@ export default function SpectrumChart({ params, c, isDark: _isDark }: SpectrumCh
       setLoading(true)
       setApiErr(null)
       try {
-        if (!params.twoDir) {
-          // Single direction — one call, share vertical
-          await fetchOne(params.QF, params.R, d => {
+        if (!seismic.twoDir) {
+          await fetchOne(seismic.QF, seismic.R, d => {
             setSpecX(d)
-            setSpecV(d)  // vertical is direction-independent
+            setSpecV(d)
           })
           setSpecY(null)
         } else {
-          // Two directions — two calls
           await Promise.all([
-            fetchOne(params.QFx, params.Rx, d => { setSpecX(d) }),
-            fetchOne(params.QFy, params.Ry, d => {
+            fetchOne(seismic.QFx, seismic.Rx, d => { setSpecX(d) }),
+            fetchOne(seismic.QFy, seismic.Ry, d => {
               setSpecY(d)
-              setSpecV(d)  // vertical from Y call (same result)
+              setSpecV(d)
             }),
           ])
         }
@@ -263,8 +260,8 @@ export default function SpectrumChart({ params, c, isDark: _isDark }: SpectrumCh
 
     fetchAll()
     return () => controller.abort()
-  }, [zone, params.site, params.group, params.QF, params.R,
-      params.QFx, params.Rx, params.QFy, params.Ry, params.twoDir])
+  }, [zone, project.site, project.group,
+      seismic.QF, seismic.R, seismic.QFx, seismic.Rx, seismic.QFy, seismic.Ry, seismic.twoDir])
 
   const isT1 = TYPE1_ZONES.has(zone)
 
@@ -291,7 +288,7 @@ export default function SpectrumChart({ params, c, isDark: _isDark }: SpectrumCh
         </div>
       </div>
 
-      {/* Params badge bar — replaces the old input panel */}
+      {/* Params badge bar */}
       <div style={{background:c.surface,border:`1px solid ${c.border}`,
         borderRadius:12,padding:"10px 14px",marginBottom:16,
         display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
@@ -300,17 +297,17 @@ export default function SpectrumChart({ params, c, isDark: _isDark }: SpectrumCh
           Paramètres généraux →
         </span>
         {[
-          {l:"Wilaya",  v:`${params.wilayaCode}`,        col:c.textSec},
-          {l:"Zone",    v:params.zone,                   col:c.blue},
-          {l:"Site",    v:params.site,                   col:c.green},
-          {l:"Groupe",  v:params.group,                  col:c.purple},
-          ...(!params.twoDir
-            ? [{l:"QF", v:params.QF.toFixed(2), col:c.amber},
-               {l:"R",  v:String(params.R),     col:c.red}]
-            : [{l:"QFx", v:params.QFx.toFixed(2), col:c.blue},
-               {l:"Rx",  v:String(params.Rx),     col:c.blue},
-               {l:"QFy", v:params.QFy.toFixed(2), col:c.purple},
-               {l:"Ry",  v:String(params.Ry),     col:c.purple}]
+          {l:"Wilaya",  v:`${project.wilayaCode}`,  col:c.textSec},
+          {l:"Zone",    v:project.zone,              col:c.blue},
+          {l:"Site",    v:project.site,              col:c.green},
+          {l:"Groupe",  v:project.group,             col:c.purple},
+          ...(!seismic.twoDir
+            ? [{l:"QF", v:seismic.QF.toFixed(2), col:c.amber},
+               {l:"R",  v:String(seismic.R),     col:c.red}]
+            : [{l:"QFx", v:seismic.QFx.toFixed(2), col:c.blue},
+               {l:"Rx",  v:String(seismic.Rx),     col:c.blue},
+               {l:"QFy", v:seismic.QFy.toFixed(2), col:c.purple},
+               {l:"Ry",  v:String(seismic.Ry),     col:c.purple}]
           ),
         ].map(b => (
           <div key={b.l} style={{background:c.elevated,borderRadius:6,
@@ -354,13 +351,13 @@ export default function SpectrumChart({ params, c, isDark: _isDark }: SpectrumCh
         <Card label="A"    value={hX.A}       unit="zone"         accent={c.amber}   c={c}/>
         <Card label="I"    value={hX.I}       unit="importance"   accent={c.purple}  c={c}/>
         <Card label="S"    value={hX.S}       unit="site"         accent={c.green}   c={c}/>
-        {!params.twoDir
-          ? <><Card label="QF"  value={typeof params.QF==='number' ? params.QF.toFixed(2) : params.QF} unit="qualité" accent={c.amber} c={c}/>
-               <Card label="R"   value={params.R} unit="comportement" accent={c.red}    c={c}/></>
-          : <><Card label="QFx" value={params.QFx.toFixed(2)} unit="dir. X"  accent={c.blue}   c={c}/>
-               <Card label="Rx"  value={params.Rx}             unit="dir. X"  accent={c.blue}   c={c}/>
-               <Card label="QFy" value={params.QFy.toFixed(2)} unit="dir. Y"  accent={c.purple} c={c}/>
-               <Card label="Ry"  value={params.Ry}             unit="dir. Y"  accent={c.purple} c={c}/></>
+        {!seismic.twoDir
+          ? <><Card label="QF"  value={seismic.QF.toFixed(2)} unit="qualité"         accent={c.amber} c={c}/>
+               <Card label="R"   value={seismic.R}             unit="comportement"   accent={c.red}   c={c}/></>
+          : <><Card label="QFx" value={seismic.QFx.toFixed(2)} unit="dir. X"  accent={c.blue}   c={c}/>
+               <Card label="Rx"  value={seismic.Rx}             unit="dir. X"  accent={c.blue}   c={c}/>
+               <Card label="QFy" value={seismic.QFy.toFixed(2)} unit="dir. Y"  accent={c.purple} c={c}/>
+               <Card label="Ry"  value={seismic.Ry}             unit="dir. Y"  accent={c.purple} c={c}/></>
         }
         <Card label="T₁"   value={hX.T1}  unit="sec" accent={c.textSec} c={c}/>
         <Card label="T₂"   value={hX.T2}  unit="sec" accent={c.textSec} c={c}/>
@@ -369,7 +366,7 @@ export default function SpectrumChart({ params, c, isDark: _isDark }: SpectrumCh
 
       {/* Charts */}
       <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:14}}>
-        {!params.twoDir ? (
+        {!seismic.twoDir ? (
           <>
             <MiniChart data={hX.pts} color={c.blue}
               T1={hX.T1} T2={hX.T2} T3={hX.T3} floor={hX.floor} peak={hX.peak}
@@ -398,10 +395,10 @@ export default function SpectrumChart({ params, c, isDark: _isDark }: SpectrumCh
         borderRadius:10,padding:"11px 14px",
         display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
         <div style={{flex:1,fontSize:12,color:c.textSec,fontFamily:"monospace",minWidth:240}}>
-          {!params.twoDir ? (
+          {!seismic.twoDir ? (
             <>
               <span style={{color:c.blue,fontWeight:700}}>Éq.3.15</span>
-              {"  "}Sad(palier)={hX.A}·{hX.I}·{hX.S}·2.5·({typeof params.QF==='number' ? params.QF.toFixed(2) : params.QF}/{params.R})={" "}
+              {"  "}Sad(palier)={hX.A}·{hX.I}·{hX.S}·2.5·({seismic.QF.toFixed(2)}/{seismic.R})={" "}
               <span style={{color:c.red,fontWeight:700}}>{hX.peak}</span>
               {"    "}
               <span style={{color:c.purple,fontWeight:700}}>Éq.3.16</span>
@@ -429,7 +426,7 @@ export default function SpectrumChart({ params, c, isDark: _isDark }: SpectrumCh
             🔌 Export → Robot
           </button>
           <button type="button"
-            onClick={() => specX && exportTxt(specX.hData, `RPA24_Sad_Zone${params.zone}_${params.site}.txt`)}
+            onClick={() => specX && exportTxt(specX.hData, `RPA24_Sad_Zone${project.zone}_${project.site}.txt`)}
             style={{padding:"8px 13px",borderRadius:8,cursor:"pointer",
               background:c.blue+"11",border:`1px solid ${c.blue}66`,
               color:c.blue,fontSize:12,fontWeight:600,
@@ -437,7 +434,7 @@ export default function SpectrumChart({ params, c, isDark: _isDark }: SpectrumCh
             📄 Sad → .txt
           </button>
           <button type="button"
-            onClick={() => specV && exportTxt(specV.vData, `RPA24_Svd_Zone${params.zone}_${params.site}.txt`)}
+            onClick={() => specV && exportTxt(specV.vData, `RPA24_Svd_Zone${project.zone}_${project.site}.txt`)}
             style={{padding:"8px 13px",borderRadius:8,cursor:"pointer",
               background:c.purple+"11",border:`1px solid ${c.purple}66`,
               color:c.purple,fontSize:12,fontWeight:600,

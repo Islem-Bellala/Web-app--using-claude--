@@ -1,12 +1,13 @@
 /**
- * StructCalc — Effort Tranchant à la Base (Session 8)
+ * StructCalc — Effort Tranchant à la Base (Phase 3)
  * RPA 2024 §4.2 — Méthode Statique Équivalente
+ * Reads all parameters from Zustand stores — no more props drilling.
  *
  * Changes from Session 7:
- *   - Seismic params read from global `params` prop (no input panel for those)
+ *   - Seismic params read from stores (no input panel)
  *   - Always computes TWO directions (X and Y)
  *   - λ correction applied: λ=0.85 if T0≤2T2 and n>2, else λ=1.0
- *   - 80% check: Vxd/Vyd vs 0.8×V — uses params.Vxd, params.Vyd
+ *   - 80% check: Vxd/Vyd vs 0.8×V — uses seismicStore.Vxd/Vyd
  *   - Coefficient de majoration shown when 80% check fails
  */
 
@@ -15,7 +16,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Cell, ResponsiveContainer,
 } from "recharts"
-import type { GlobalParams, AppColors, BaseShearResult, StoryForce } from "../../types"
+import type { AppColors, BaseShearResult, StoryForce } from "../../types"
+import { useProjectStore, useSeismicStore, useStructuralStore } from "../../stores"
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -128,7 +130,6 @@ function DirectionPanel({ dir, result, Vdyn, color, c }: DirectionPanelProps) {
   return (
     <div style={{flex:1,minWidth:280,display:"flex",flexDirection:"column",gap:12}}>
 
-      {/* Direction header */}
       <div style={{background:color+"11",border:`1px solid ${color}33`,
         borderRadius:8,padding:"8px 12px",
         fontSize:12,color:color,fontWeight:700,
@@ -136,7 +137,6 @@ function DirectionPanel({ dir, result, Vdyn, color, c }: DirectionPanelProps) {
         Direction {dir}
       </div>
 
-      {/* Key cards */}
       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
         <ResultCard label="T_emp"    value={result.T_emp.toFixed(3)} unit="s"       accent={c.purple}  c={c}/>
         <ResultCard label="T₀"       value={result.T0.toFixed(3)}    unit="s"       accent={color}     c={c}/>
@@ -148,7 +148,6 @@ function DirectionPanel({ dir, result, Vdyn, color, c }: DirectionPanelProps) {
         )}
       </div>
 
-      {/* Formula trace */}
       <div style={{background:c.surface,border:`1px solid ${c.border}`,
         borderRadius:8,padding:"9px 13px",fontSize:11,color:c.textSec,fontFamily:"monospace"}}>
         V = <span style={{color:c.amber}}>{result.lambda_coef}</span>
@@ -160,10 +159,8 @@ function DirectionPanel({ dir, result, Vdyn, color, c }: DirectionPanelProps) {
         )}
       </div>
 
-      {/* 80% check */}
       <Check80 label={`Sens ${dir}`} Vdyn={Vdyn} Vstat={result.V} c={c}/>
 
-      {/* Bar chart */}
       <div style={{background:c.surface,border:`1px solid ${c.border}`,
         borderRadius:10,padding:"14px 12px 10px"}}>
         <div style={{fontSize:11,color:c.textSec,marginBottom:10,fontWeight:600}}>
@@ -186,7 +183,6 @@ function DirectionPanel({ dir, result, Vdyn, color, c }: DirectionPanelProps) {
         </ResponsiveContainer>
       </div>
 
-      {/* Results table */}
       <div style={{background:c.surface,border:`1px solid ${c.border}`,
         borderRadius:10,overflow:"hidden",fontSize:11}}>
         <table style={{width:"100%",borderCollapse:"collapse"}}>
@@ -236,19 +232,22 @@ function DirectionPanel({ dir, result, Vdyn, color, c }: DirectionPanelProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface BaseShearPageProps {
-  params: GlobalParams;
   c: AppColors;
 }
 
-export default function BaseShearPage({ params, c }: BaseShearPageProps) {
+export default function BaseShearPage({ c }: BaseShearPageProps) {
+  // Read from stores
+  const project    = useProjectStore()
+  const seismic    = useSeismicStore()
+  const structural = useStructuralStore()
+
   const [resultX, setResultX] = useState<BaseShearResult | null>(null)
   const [resultY, setResultY] = useState<BaseShearResult | null>(null)
   const [loading,  setLoading] = useState<boolean>(false)
   const [apiErr,   setApiErr]  = useState<string | null>(null)
 
-  // Prepare stories payload
   function storiesPayload() {
-    return [...params.stories]
+    return [...structural.stories]
       .map(s => ({name:s.name.trim(), elevation:parseFloat(s.elevation), weight:parseFloat(s.weight)}))
       .filter(s => s.elevation>0 && s.weight>0)
       .sort((a,b) => a.elevation-b.elevation)
@@ -256,7 +255,7 @@ export default function BaseShearPage({ params, c }: BaseShearPageProps) {
 
   function isReady(): boolean {
     const sp = storiesPayload()
-    return sp.length >= 1 && parseFloat(params.stories.map(s => s.elevation).filter(Boolean).slice(-1)[0]) > 0
+    return sp.length >= 1 && parseFloat(structural.stories.map(s => s.elevation).filter(Boolean).slice(-1)[0]) > 0
   }
 
   async function fetchDirection(QF: number, R: number, TCalc: string): Promise<BaseShearResult> {
@@ -266,11 +265,11 @@ export default function BaseShearPage({ params, c }: BaseShearPageProps) {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body: JSON.stringify({
-        zone:             params.zone==="0" ? "I" : params.zone,
-        site_class:       params.site,
-        importance_group: params.group,
+        zone:             project.zone === "0" ? "I" : project.zone,
+        site_class:       project.site,
+        importance_group: project.group,
         QF, R,
-        frame_system:     params.frameSys,
+        frame_system:     seismic.frameSys,
         hn,
         T_calculated:     TCalc ? parseFloat(TCalc) : null,
         stories:          sp,
@@ -290,14 +289,14 @@ export default function BaseShearPage({ params, c }: BaseShearPageProps) {
     try {
       const [rX, rY] = await Promise.all([
         fetchDirection(
-          params.twoDir ? params.QFx : params.QF,
-          params.twoDir ? params.Rx  : params.R,
-          params.Tx
+          seismic.twoDir ? seismic.QFx : seismic.QF,
+          seismic.twoDir ? seismic.Rx  : seismic.R,
+          seismic.Tx
         ),
         fetchDirection(
-          params.twoDir ? params.QFy : params.QF,
-          params.twoDir ? params.Ry  : params.R,
-          params.Ty
+          seismic.twoDir ? seismic.QFy : seismic.QF,
+          seismic.twoDir ? seismic.Ry  : seismic.R,
+          seismic.Ty
         ),
       ])
       setResultX(rX)
@@ -313,6 +312,8 @@ export default function BaseShearPage({ params, c }: BaseShearPageProps) {
       setLoading(false)
     }
   }
+
+  const totalW = structural.stories.reduce((a,s) => a+(parseFloat(s.weight)||0), 0)
 
   return (
     <div style={{background:c.bg,minHeight:"100vh",color:c.text,
@@ -342,18 +343,18 @@ export default function BaseShearPage({ params, c }: BaseShearPageProps) {
           Paramètres généraux →
         </span>
         {[
-          {l:"Zone",  v:params.zone,  col:c.blue},
-          {l:"Site",  v:params.site,  col:c.green},
-          {l:"Groupe",v:params.group, col:c.purple},
-          ...(!params.twoDir
-            ? [{l:"QF",v:params.QF.toFixed(2),col:c.amber},{l:"R",v:String(params.R),col:c.red}]
-            : [{l:"QFx",v:params.QFx.toFixed(2),col:c.blue},{l:"Rx",v:String(params.Rx),col:c.blue},
-               {l:"QFy",v:params.QFy.toFixed(2),col:c.purple},{l:"Ry",v:String(params.Ry),col:c.purple}]
+          {l:"Zone",  v:project.zone,  col:c.blue},
+          {l:"Site",  v:project.site,  col:c.green},
+          {l:"Groupe",v:project.group, col:c.purple},
+          ...(!seismic.twoDir
+            ? [{l:"QF",v:seismic.QF.toFixed(2),col:c.amber},{l:"R",v:String(seismic.R),col:c.red}]
+            : [{l:"QFx",v:seismic.QFx.toFixed(2),col:c.blue},{l:"Rx",v:String(seismic.Rx),col:c.blue},
+               {l:"QFy",v:seismic.QFy.toFixed(2),col:c.purple},{l:"Ry",v:String(seismic.Ry),col:c.purple}]
           ),
-          {l:"Niveaux", v:String(params.stories.length), col:c.textSec},
-          {l:"W", v:`${params.stories.reduce((a,s)=>a+(parseFloat(s.weight)||0),0).toFixed(0)} kN`, col:c.green},
-          ...(params.Tx ? [{l:"Tx",v:`${params.Tx}s`,col:c.blue}] : []),
-          ...(params.Ty ? [{l:"Ty",v:`${params.Ty}s`,col:c.purple}] : []),
+          {l:"Niveaux", v:String(structural.stories.length), col:c.textSec},
+          {l:"W", v:`${totalW.toFixed(0)} kN`, col:c.green},
+          ...(seismic.Tx ? [{l:"Tx",v:`${seismic.Tx}s`,col:c.blue}] : []),
+          ...(seismic.Ty ? [{l:"Ty",v:`${seismic.Ty}s`,col:c.purple}] : []),
         ].map(b => (
           <div key={b.l} style={{background:c.elevated,borderRadius:6,padding:"4px 9px",fontSize:12}}>
             <span style={{color:c.textMuted}}>{b.l} </span>
@@ -363,13 +364,13 @@ export default function BaseShearPage({ params, c }: BaseShearPageProps) {
       </div>
 
       {/* Dynamic inputs info */}
-      {(params.Vxd || params.Vyd) && (
+      {(seismic.Vxd || seismic.Vyd) && (
         <div style={{background:c.amber+"11",border:`1px solid ${c.amber}33`,
           borderRadius:8,padding:"8px 13px",marginBottom:14,fontSize:12,color:c.amber,
           display:"flex",gap:16}}>
           <span>📊 Vérification 80% :</span>
-          {params.Vxd && <span>Vxd = <b>{params.Vxd} kN</b></span>}
-          {params.Vyd && <span>Vyd = <b>{params.Vyd} kN</b></span>}
+          {seismic.Vxd && <span>Vxd = <b>{seismic.Vxd} kN</b></span>}
+          {seismic.Vyd && <span>Vyd = <b>{seismic.Vyd} kN</b></span>}
         </div>
       )}
 
@@ -395,10 +396,10 @@ export default function BaseShearPage({ params, c }: BaseShearPageProps) {
       {(resultX || resultY) && (
         <div style={{display:"flex",gap:18,flexWrap:"wrap",alignItems:"flex-start"}}>
           <DirectionPanel dir="X" result={resultX}
-            Vdyn={params.Vxd ? parseFloat(params.Vxd) : null}
+            Vdyn={seismic.Vxd ? parseFloat(seismic.Vxd) : null}
             color={c.blue} c={c}/>
           <DirectionPanel dir="Y" result={resultY}
-            Vdyn={params.Vyd ? parseFloat(params.Vyd) : null}
+            Vdyn={seismic.Vyd ? parseFloat(seismic.Vyd) : null}
             color={c.purple} c={c}/>
         </div>
       )}
