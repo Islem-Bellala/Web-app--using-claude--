@@ -102,9 +102,13 @@ def test_get_zone_split_wilaya_unlisted_commune():
 
 
 def test_get_zone_jijel_split():
-    """Jijel (18): default VI, El Milia is an exception at IV."""
-    assert get_zone("18") == "VI"             # default from WILAYAS
-    assert get_zone("18", "El Milia") == "IV" # commune exception
+    """Jijel (18): listed zone VI; unlisted commune → V; explicit exceptions → VI or IV."""
+    assert get_zone("18") == "VI"                           # wilaya-level default (no commune)
+    assert get_zone("18", "Jijel") == "VI"                  # Groupe A
+    assert get_zone("18", "Ziama Mansouriah") == "VI"       # Groupe A
+    assert get_zone("18", "El Milia") == "IV"               # Groupe C
+    assert get_zone("18", "Kheiri Oued Adjoul") == "IV"     # Groupe C
+    assert get_zone("18", "any unlisted commune") == "V"    # Groupe B (default)
 
 
 def test_get_zone_setif_split():
@@ -187,9 +191,14 @@ def test_get_communes_boumerdes_count():
 
 
 def test_get_communes_jijel():
-    """Jijel has 4 special communes."""
+    """Jijel has 11 explicitly listed communes (6 in Zone VI, 5 in Zone IV)."""
     communes = get_communes("18")
-    assert len(communes) == 4
+    assert len(communes) == 11
     names = {c["name"] for c in communes}
+    # Groupe A — Zone VI
     assert "Jijel" in names
+    assert "Ziama Mansouriah" in names
+    assert "Kaous" in names
+    # Groupe C — Zone IV
     assert "El Milia" in names
+    assert "Sidi Abdelaziz" in names

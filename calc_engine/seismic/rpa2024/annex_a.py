@@ -110,10 +110,20 @@ _COMMUNES: dict[str, dict] = {
     ]},
     "16": {"default_zone": "VI", "communes": []},
     "18": {"default_zone": "V", "communes": [
-        {"name": "El Taguene", "zone": "VI"},
-        {"name": "El Aouana",  "zone": "VI"},
-        {"name": "Jijel",      "zone": "VI"},
-        {"name": "El Milia",   "zone": "IV"},
+        # Groupe A — Zone VI
+        {"name": "El Taguene",       "zone": "VI"},
+        {"name": "El Aouana",        "zone": "VI"},
+        {"name": "Ziama Mansouriah", "zone": "VI"},
+        {"name": "Selma Ben Ziada",  "zone": "VI"},
+        {"name": "Jijel",            "zone": "VI"},
+        {"name": "Kaous",            "zone": "VI"},
+        # Groupe C — Zone IV
+        {"name": "Djemaa Beni Habibi", "zone": "IV"},
+        {"name": "El Ancer",           "zone": "IV"},
+        {"name": "El Milia",           "zone": "IV"},
+        {"name": "Kheiri Oued Adjoul", "zone": "IV"},
+        {"name": "Sidi Abdelaziz",     "zone": "IV"},
+        # Groupe B (Zone V) = all other communes — handled by default_zone
     ]},
     "19": {"default_zone": "IV", "communes": [
         {"name": "Babor",          "zone": "VI"},
@@ -221,6 +231,9 @@ def get_zone(wilaya_code: str, commune: str | None = None) -> str:
         for c in commune_data["communes"]:
             if c["name"] == commune:
                 return c["zone"]
+        # Commune not in the explicit list → use commune-level default
+        # (e.g. Jijel "Groupe B" = Zone V for any unlisted commune)
+        return commune_data["default_zone"]
 
     return default_zone
 
