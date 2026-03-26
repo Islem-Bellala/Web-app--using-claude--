@@ -14,6 +14,7 @@ import {
 } from "recharts"
 import type { AppColors, SpectrumPoint } from "../../types"
 import { useProjectStore, useSeismicStore } from "../../stores"
+import { computeSpectrum } from "../../services/api"
 
 // ── Local types for spectrum state ──────────────────────────────────────────
 
@@ -195,19 +196,9 @@ export default function SpectrumChart({ c, isDark: _isDark }: SpectrumChartProps
       R: number,
       setFn: (d: SpectrumState) => void,
     ) {
-      const res = await fetch("http://localhost:8000/api/v1/spectrum", {
-        method : "POST",
-        headers: { "Content-Type": "application/json" },
-        body   : JSON.stringify({
-          zone, site_class: project.site, importance_group: project.group, QF, R, T_step: 0.01
-        }),
-        signal: controller.signal,
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({detail:`HTTP ${res.status}`}))
-        throw new Error((err as {detail?:string}).detail || `Erreur ${res.status}`)
-      }
-      const data = await res.json()
+      const data = await computeSpectrum({
+        zone, site_class: project.site, importance_group: project.group, QF, R, T_step: 0.01
+      }, controller.signal)
       setFn({
         hData: {
           A: data.A, I: data.I, S: data.S,

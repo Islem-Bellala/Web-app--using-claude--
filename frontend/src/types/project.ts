@@ -1,3 +1,17 @@
+// ── Wilaya / Commune (Annex A) ────────────────────────────────────────────────
+
+export interface WilayaInfo {
+  code: string;
+  name: string;
+  zone: string;
+  has_split_zones: boolean;
+}
+
+export interface CommuneInfo {
+  name: string;
+  zone: string;
+}
+
 // Story as stored in state — elevation/weight/drx/dry are strings (form input values)
 export interface Story {
   id: number;

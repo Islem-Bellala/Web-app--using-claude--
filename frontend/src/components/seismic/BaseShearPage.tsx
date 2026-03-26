@@ -18,6 +18,7 @@ import {
 } from "recharts"
 import type { AppColors, BaseShearResult, StoryForce } from "../../types"
 import { useProjectStore, useSeismicStore, useStructuralStore } from "../../stores"
+import { computeBaseShear } from "../../services/api"
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -261,25 +262,16 @@ export default function BaseShearPage({ c }: BaseShearPageProps) {
   async function fetchDirection(QF: number, R: number, TCalc: string): Promise<BaseShearResult> {
     const sp = storiesPayload()
     const hn = Math.max(...sp.map(s => s.elevation))
-    const res = await fetch("http://localhost:8000/api/v1/base_shear", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({
-        zone:             project.zone === "0" ? "I" : project.zone,
-        site_class:       project.site,
-        importance_group: project.group,
-        QF, R,
-        frame_system:     seismic.frameSys,
-        hn,
-        T_calculated:     TCalc ? parseFloat(TCalc) : null,
-        stories:          sp,
-      })
+    return computeBaseShear({
+      zone:             project.zone === "0" ? "I" : project.zone,
+      site_class:       project.site,
+      importance_group: project.group,
+      QF, R,
+      frame_system:     seismic.frameSys,
+      hn,
+      T_calculated:     TCalc ? parseFloat(TCalc) : null,
+      stories:          sp,
     })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({detail:`HTTP ${res.status}`}))
-      throw new Error((err as {detail?:string}).detail || `Erreur ${res.status}`)
-    }
-    return res.json() as Promise<BaseShearResult>
   }
 
   async function calculate() {

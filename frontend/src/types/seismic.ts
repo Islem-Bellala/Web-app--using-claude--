@@ -1,16 +1,5 @@
-// ── Wilaya / Commune (Annex A) ────────────────────────────────────────────────
-
-export interface WilayaInfo {
-  code: string;
-  name: string;
-  zone: string;
-  has_split_zones: boolean;
-}
-
-export interface CommuneInfo {
-  name: string;
-  zone: string;
-}
+// Re-export location types (canonical home: project.ts)
+export type { WilayaInfo, CommuneInfo } from './project';
 
 // ── Spectrum API ──────────────────────────────────────────────────────────────
 

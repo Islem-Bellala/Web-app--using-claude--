@@ -6,7 +6,9 @@
       "Bash(pip install:*)",
       "Bash(python -c \"from calc_engine.seismic.rpa2024.annex_a import get_all_wilayas; print\\(len\\(get_all_wilayas\\(\\)\\)\\)\")",
       "Bash(npm install:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(python -m pytest tests/ -v)"
     ]
   }
 }

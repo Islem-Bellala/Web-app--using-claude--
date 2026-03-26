@@ -8,112 +8,11 @@
  * Block 4 — Résultats analyse dyn.  (Tx, Ty, Vxd, Vyd, déplacements)
  */
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import QFModal, { DEF_CHECKED } from "../shared/QFModal"
 import RModal, { type BracingSystem } from "../shared/RModal"
 import type { AppColors } from "../../types"
 import { useProjectStore, useSeismicStore, useStructuralStore } from "../../stores"
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WILAYA DATA — RPA 2024 Annex A
-// NOTE: Still hardcoded here — will be removed in Phase 4 (fetched from API)
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface WilayaEntry {
-  code: string;
-  name: string;
-  zone: string;
-  split: boolean;
-}
-
-interface CommuneEntry {
-  name: string;
-  zone: string;
-}
-
-interface CommuneData {
-  defaultZone: string;
-  communes: CommuneEntry[];
-}
-
-const WILAYAS: WilayaEntry[] = [
-  {code:"01",name:"Adrar",              zone:"0",  split:false},
-  {code:"02",name:"Chlef",              zone:"VI", split:true },
-  {code:"03",name:"Laghouat",           zone:"II", split:true },
-  {code:"04",name:"Oum El Bouaghi",     zone:"IV", split:true },
-  {code:"05",name:"Batna",              zone:"III",split:true },
-  {code:"06",name:"Béjaïa",           zone:"VI", split:true },
-  {code:"07",name:"Biskra",             zone:"III",split:true },
-  {code:"08",name:"Béchar",           zone:"I",  split:false},
-  {code:"09",name:"Blida",              zone:"VI", split:false},
-  {code:"10",name:"Bouira",             zone:"V",  split:true },
-  {code:"11",name:"Tamanrasset",        zone:"0",  split:false},
-  {code:"12",name:"Tébessa",          zone:"III",split:true },
-  {code:"13",name:"Tlemcen",            zone:"IV", split:true },
-  {code:"14",name:"Tiaret",             zone:"III",split:true },
-  {code:"15",name:"Tizi Ouzou",         zone:"V",  split:true },
-  {code:"16",name:"Alger",              zone:"VI", split:false},
-  {code:"17",name:"Djelfa",             zone:"III",split:true },
-  {code:"18",name:"Jijel",              zone:"VI", split:true },
-  {code:"19",name:"Sétif",            zone:"IV", split:true },
-  {code:"20",name:"Saïda",           zone:"I",  split:true },
-  {code:"21",name:"Skikda",             zone:"IV", split:true },
-  {code:"22",name:"Sidi Bel Abbès",  zone:"I",  split:true },
-  {code:"23",name:"Annaba",             zone:"IV", split:false},
-  {code:"24",name:"Guelma",             zone:"V",  split:false},
-  {code:"25",name:"Constantine",        zone:"V",  split:false},
-  {code:"26",name:"Médéa",           zone:"V",  split:true },
-  {code:"27",name:"Mostaganem",         zone:"V",  split:true },
-  {code:"28",name:"M'Sila",          zone:"IV", split:true },
-  {code:"29",name:"Mascara",            zone:"VI", split:true },
-  {code:"30",name:"Ouargla",            zone:"0",  split:false},
-  {code:"31",name:"Oran",               zone:"VI", split:true },
-  {code:"32",name:"El Bayadh",          zone:"II", split:true },
-  {code:"33",name:"Illizi",             zone:"0",  split:false},
-  {code:"34",name:"Bordj Bou Arréridj",zone:"V", split:true },
-  {code:"35",name:"Boumerdès",       zone:"VI", split:true },
-  {code:"36",name:"El Tarf",            zone:"V",  split:true },
-  {code:"37",name:"Tindouf",            zone:"0",  split:false},
-  {code:"38",name:"Tissemsilt",         zone:"IV", split:true },
-  {code:"39",name:"El Oued",            zone:"II", split:true },
-  {code:"40",name:"Khenchela",          zone:"III",split:true },
-  {code:"41",name:"Souk Ahras",         zone:"V",  split:true },
-  {code:"42",name:"Tipaza",             zone:"VI", split:false},
-  {code:"43",name:"Mila",               zone:"V",  split:true },
-  {code:"44",name:"Aïn Defla",       zone:"VI", split:true },
-  {code:"45",name:"Naâma",           zone:"II", split:true },
-  {code:"46",name:"Aïn Témouchent", zone:"V",  split:true },
-  {code:"47",name:"Ghardaïa",        zone:"I",  split:false},
-  {code:"48",name:"Relizane",           zone:"VI", split:true },
-  {code:"49",name:"Timimoun",           zone:"0",  split:false},
-  {code:"50",name:"Bordj Badji Mokhtar",zone:"0", split:false},
-  {code:"51",name:"Ouled Djellal",      zone:"II", split:false},
-  {code:"52",name:"Béni Abbès",      zone:"0",  split:false},
-  {code:"53",name:"In Salah",           zone:"0",  split:false},
-  {code:"54",name:"In Guezzam",         zone:"0",  split:false},
-  {code:"55",name:"Touggourt",          zone:"I",  split:false},
-  {code:"56",name:"Djanet",             zone:"0",  split:false},
-  {code:"57",name:"El M'Ghair",      zone:"I",  split:false},
-  {code:"58",name:"El Meniaa",          zone:"0",  split:false},
-]
-
-// Partial commune data (key split wilayas — same as SpectrumChart Session 5)
-const WILAYA_COMMUNES: Record<string, CommuneData> = {
-  "02":{defaultZone:"VI",communes:[{name:"Beni Bouattab",zone:"V"},{name:"Taougrite",zone:"V"},{name:"El Marsa",zone:"V"},{name:"Dahra",zone:"V"}]},
-  "09":{defaultZone:"VI",communes:[]},
-  "16":{defaultZone:"VI",communes:[]},
-  "35":{defaultZone:"VI",communes:[{name:"Chaabet El Ameur",zone:"V"},{name:"Leghata",zone:"V"},{name:"Timezrit",zone:"V"},{name:"Isser",zone:"V"},{name:"Bordj Menaiel",zone:"V"},{name:"Naciria",zone:"V"},{name:"Sidi Daoud",zone:"IV"},{name:"Dellys",zone:"IV"},{name:"Afir",zone:"IV"},{name:"Baghlia",zone:"IV"}]},
-  "42":{defaultZone:"VI",communes:[]},
-  "44":{defaultZone:"VI",communes:[{name:"Djelida",zone:"V"},{name:"El Maine",zone:"V"},{name:"Zeddine",zone:"V"},{name:"Tarik Ibn Ziad",zone:"IV"},{name:"El Hassania",zone:"IV"}]},
-  "48":{defaultZone:"VI",communes:[{name:"Ouled Yaich",zone:"V"},{name:"Zemmora",zone:"V"},{name:"Ain Tarek",zone:"IV"},{name:"El Hassi",zone:"IV"}]},
-  "06":{defaultZone:"VI",communes:[{name:"Toudja",zone:"V"},{name:"Adekar",zone:"V"},{name:"El Kseur",zone:"V"},{name:"Akfadou",zone:"V"}]},
-  "29":{defaultZone:"VI",communes:[{name:"Ain Fares",zone:"V"},{name:"Sidi Abdelmoumen",zone:"V"}]},
-  "18":{defaultZone:"V",communes:[{name:"El Taguene",zone:"VI"},{name:"El Aouana",zone:"VI"},{name:"Jijel",zone:"VI"},{name:"El Milia",zone:"IV"}]},
-  "19":{defaultZone:"IV",communes:[{name:"Babor",zone:"VI"},{name:"Bousselam",zone:"VI"},{name:"Ain Sebt",zone:"V"},{name:"Ain El Kebira",zone:"V"},{name:"Bougaa",zone:"V"}]},
-  "10":{defaultZone:"V",communes:[{name:"Taguedit",zone:"IV"},{name:"Mezdour",zone:"IV"},{name:"Dirah",zone:"IV"}]},
-  "15":{defaultZone:"IV",communes:[{name:"Illilten",zone:"V"},{name:"Bouzguen",zone:"V"},{name:"Boghni",zone:"V"},{name:"Draa El Mizan",zone:"V"},{name:"Tizi Ghenif",zone:"V"}]},
-  "34":{defaultZone:"IV",communes:[{name:"Tafreg",zone:"V"},{name:"Djaafra",zone:"V"},{name:"El Main",zone:"V"}]},
-}
 
 const ZONE_LABELS: Record<string, string> = {
   "0":"Zone 0 — Très faible",
@@ -216,31 +115,16 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
   const [showQF, setShowQF] = useState<string | null>(null)
   const [showR,  setShowR]  = useState<string | null>(null)
 
-  // Derive zone from wilaya + commune
-  const wilaya      = WILAYAS.find(w => w.code === project.wilayaCode) ?? WILAYAS[8]
-  const communeData = WILAYA_COMMUNES[project.wilayaCode]
-  const hasCommunes = !!(communeData && communeData.communes.length > 0)
+  // Fetch wilayas on mount if not already loaded
+  useEffect(() => {
+    if (project.wilayas.length === 0) {
+      project.fetchWilayas()
+    }
+  }, [])
 
-  function deriveZone(code: string, commune: string): string {
-    const w = WILAYAS.find(w2 => w2.code === code) ?? WILAYAS[8]
-    const cd = WILAYA_COMMUNES[code]
-    if (!commune || !cd) return w.zone
-    const found = cd.communes.find(c2 => c2.name === commune)
-    return found ? found.zone : cd.defaultZone
-  }
-
-  function handleWilayaChange(code: string) {
-    const newZone = deriveZone(code, "")
-    project.setWilaya(code)
-    project.setCommune("")
-    project.setZone(newZone)
-  }
-
-  function handleCommuneChange(commune: string) {
-    const newZone = deriveZone(project.wilayaCode, commune)
-    project.setCommune(commune)
-    project.setZone(newZone)
-  }
+  // Current wilaya info from store
+  const wilaya = project.wilayas.find(w => w.code === project.wilayaCode)
+  const hasCommunes = project.communes.length > 0
 
   // QF modal helpers
   function handleQFValidate(qf: number, cat: string, chk: Record<string, boolean>) {
@@ -351,21 +235,23 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
 
             {/* Wilaya */}
             <Field label="Wilaya" c={c}>
-              <select value={project.wilayaCode} onChange={e => handleWilayaChange(e.target.value)}
+              <select value={project.wilayaCode} onChange={e => project.setWilaya(e.target.value)}
+                disabled={project.wilayasLoading}
                 style={inputStyle}>
-                {WILAYAS.map(w => (
+                {project.wilayas.map(w => (
                   <option key={w.code} value={w.code}>{w.code} — {w.name}</option>
                 ))}
               </select>
             </Field>
 
-            {/* Commune — only if split wilaya */}
-            {wilaya.split && hasCommunes && (
+            {/* Commune — only if split wilaya with communes */}
+            {wilaya?.has_split_zones && hasCommunes && (
               <Field label="Commune" c={c}>
-                <select value={project.commune} onChange={e => handleCommuneChange(e.target.value)}
+                <select value={project.commune} onChange={e => project.setCommune(e.target.value)}
+                  disabled={project.communesLoading}
                   style={{...inputStyle,border:`1px solid ${c.amber}66`}}>
-                  <option value="">— Autre commune (Zone {communeData?.defaultZone || wilaya.zone})</option>
-                  {[...communeData.communes]
+                  <option value="">— Autre commune (Zone {wilaya.zone})</option>
+                  {[...project.communes]
                     .sort((a,b) => a.zone.localeCompare(b.zone)||a.name.localeCompare(b.name))
                     .map(cm => (
                       <option key={cm.name} value={cm.name}>{cm.name} → Zone {cm.zone}</option>
@@ -373,7 +259,7 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
                 </select>
               </Field>
             )}
-            {wilaya.split && !hasCommunes && (
+            {wilaya?.has_split_zones && !hasCommunes && !project.communesLoading && (
               <div style={{background:c.amber+"11",border:`1px solid ${c.amber}44`,
                 borderRadius:8,padding:"8px 10px",fontSize:11,color:c.amber,
                 lineHeight:1.5,marginBottom:10}}>
