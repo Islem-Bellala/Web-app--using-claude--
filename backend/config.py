@@ -21,7 +21,14 @@ class Settings(BaseSettings):
     ]
     debug: bool = True
 
-    # Future: database_url, secret_key, jwt_algorithm, etc.
+    # Database
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/bunyan"
+
+    # JWT
+    jwt_secret_key: str = "dev-secret-change-in-production"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

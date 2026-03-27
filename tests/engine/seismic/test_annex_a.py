@@ -102,8 +102,8 @@ def test_get_zone_split_wilaya_unlisted_commune():
 
 
 def test_get_zone_jijel_split():
-    """Jijel (18): listed zone VI; unlisted commune → V; explicit exceptions → VI or IV."""
-    assert get_zone("18") == "VI"                           # wilaya-level default (no commune)
+    """Jijel (18): default V; listed zone VI communes; unlisted commune → V; zone IV exceptions."""
+    assert get_zone("18") == "V"                            # wilaya-level default (no commune)
     assert get_zone("18", "Jijel") == "VI"                  # Groupe A
     assert get_zone("18", "Ziama Mansouriah") == "VI"       # Groupe A
     assert get_zone("18", "El Milia") == "IV"               # Groupe C
@@ -185,9 +185,9 @@ def test_get_communes_empty_split_wilaya():
 
 
 def test_get_communes_boumerdes_count():
-    """Boumerdes has 10 listed special communes."""
+    """Boumerdes has 14 listed special communes (8 Zone V, 6 Zone IV)."""
     communes = get_communes("35")
-    assert len(communes) == 10
+    assert len(communes) == 14
 
 
 def test_get_communes_jijel():
@@ -199,6 +199,32 @@ def test_get_communes_jijel():
     assert "Jijel" in names
     assert "Ziama Mansouriah" in names
     assert "Kaous" in names
+    assert "Erraguene" in names          # verified spelling from clean Annex A PDF
     # Groupe C — Zone IV
     assert "El Milia" in names
     assert "Sidi Abdelaziz" in names
+
+
+# =============================================================================
+# TEST — Annex A completeness (hotfix assertions)
+# =============================================================================
+
+def test_split_wilaya_count():
+    """Exactly 35 wilayas must have has_split_zones=True (RPA 2024 Annex A)."""
+    split = [w for w in get_all_wilayas() if w["has_split_zones"]]
+    assert len(split) == 35, (
+        f"Expected 35 split wilayas, got {len(split)}: "
+        + str([w["code"] for w in split])
+    )
+
+
+def test_all_split_wilayas_have_communes():
+    """Every wilaya flagged has_split_zones=True must have at least one listed commune."""
+    missing = [
+        w for w in get_all_wilayas()
+        if w["has_split_zones"] and len(get_communes(w["code"])) == 0
+    ]
+    assert missing == [], (
+        "Split wilayas with empty commune list: "
+        + str([(w["code"], w["name"]) for w in missing])
+    )

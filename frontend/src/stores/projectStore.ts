@@ -1,40 +1,64 @@
 import { create } from 'zustand';
-import type { WilayaInfo, CommuneInfo } from '../types';
-import { fetchWilayas as apiFetchWilayas, fetchCommunes as apiFetchCommunes, fetchZone as apiFetchZone } from '../services/api';
+import type { WilayaInfo, CommuneInfo, ProjectSummary, ProjectState } from '../types';
+import {
+  fetchWilayas as apiFetchWilayas,
+  fetchCommunes as apiFetchCommunes,
+  fetchZone as apiFetchZone,
+  apiCreateProject,
+  apiListProjects,
+  apiGetProject,
+  apiSaveProjectState,
+  apiDeleteProject,
+} from '../services/api';
 
-interface ProjectState {
+interface ProjectStore {
   // Location & classification
   wilayaCode: string;
   commune: string;
-  zone: string;         // derived from wilaya + commune
-  site: string;         // "S1" | "S2" | "S3" | "S4"
-  group: string;        // "1A" | "1B" | "2" | "3"
+  zone: string;
+  site: string;
+  group: string;
 
-  // Project metadata
+  // Project metadata (displayed in params form)
   projectName: string;
   engineer: string;
   reference: string;
   date: string;
 
-  // Reference data (fetched from API)
+  // Reference data (fetched from API — NOT persisted)
   wilayas: WilayaInfo[];
   communes: CommuneInfo[];
   wilayasLoading: boolean;
   communesLoading: boolean;
 
-  // Actions
+  // Persistence — current open project
+  currentProjectId: string | null;
+  currentProjectName: string;
+  projects: ProjectSummary[];
+  isSaving: boolean;
+
+  // Setters
   setWilaya: (code: string) => void;
   setCommune: (commune: string) => void;
   setZone: (zone: string) => void;
   setSite: (site: string) => void;
   setGroup: (group: string) => void;
-  setProjectMeta: (meta: Partial<Pick<ProjectState, 'projectName' | 'engineer' | 'reference' | 'date'>>) => void;
+  setProjectMeta: (meta: Partial<Pick<ProjectStore, 'projectName' | 'engineer' | 'reference' | 'date'>>) => void;
   resetProject: () => void;
 
-  // Async actions
+  // Async — reference data
   fetchWilayas: () => Promise<void>;
   fetchCommunes: (code: string) => Promise<void>;
   deriveZone: (code: string, commune?: string) => Promise<void>;
+
+  // Persistence
+  serializeState: () => ProjectState['project'];
+  hydrateState: (state: ProjectState['project']) => void;
+  fetchProjects: () => Promise<void>;
+  createProject: (name: string, description?: string) => Promise<void>;
+  saveCurrentProject: () => Promise<void>;
+  loadProject: (id: string) => Promise<ProjectState | null>;
+  deleteProject: (id: string) => Promise<void>;
 }
 
 const today = new Date().toISOString().split('T')[0];
@@ -53,18 +77,28 @@ const initialState = {
   communes: [] as CommuneInfo[],
   wilayasLoading: false,
   communesLoading: false,
+  currentProjectId: null as string | null,
+  currentProjectName: '',
+  projects: [] as ProjectSummary[],
+  isSaving: false,
 };
 
-export const useProjectStore = create<ProjectState>((set, get) => ({
+export const useProjectStore = create<ProjectStore>((set, get) => ({
   ...initialState,
 
   setZone: (zone) => set({ zone }),
   setSite: (site) => set({ site }),
   setGroup: (group) => set({ group }),
   setProjectMeta: (meta) => set((state) => ({ ...state, ...meta })),
-  resetProject: () => set(initialState),
+  resetProject: () => set({
+    ...initialState,
+    wilayas: get().wilayas,        // keep loaded reference data
+    currentProjectId: null,
+    currentProjectName: '',
+  }),
 
-  // Fetch wilayas list from API
+  // ── Reference data ──────────────────────────────────────────────────────────
+
   fetchWilayas: async () => {
     set({ wilayasLoading: true });
     try {
@@ -75,7 +109,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  // Fetch communes for a given wilaya
   fetchCommunes: async (code: string) => {
     set({ communesLoading: true });
     try {
@@ -86,7 +119,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  // Derive zone from API
   deriveZone: async (code: string, commune?: string) => {
     try {
       const zone = await apiFetchZone(code, commune);
@@ -96,7 +128,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  // Set wilaya: clears commune/zone, fetches communes if split, derives zone if single
   setWilaya: (code: string) => {
     set({ wilayaCode: code, commune: '', zone: '', communes: [] });
     const { wilayas } = get();
@@ -108,10 +139,105 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  // Set commune: auto-derives zone
   setCommune: (commune: string) => {
     set({ commune });
     const { wilayaCode } = get();
     get().deriveZone(wilayaCode, commune);
+  },
+
+  // ── Serialization ───────────────────────────────────────────────────────────
+
+  serializeState: () => {
+    const s = get();
+    return {
+      wilayaCode: s.wilayaCode,
+      commune:    s.commune,
+      zone:       s.zone,
+      site:       s.site,
+      group:      s.group,
+      projectName: s.projectName,
+      engineer:   s.engineer,
+      reference:  s.reference,
+      date:       s.date,
+    };
+  },
+
+  hydrateState: (state) => {
+    set({
+      wilayaCode:  state.wilayaCode  ?? get().wilayaCode,
+      commune:     state.commune     ?? '',
+      zone:        state.zone        ?? '',
+      site:        state.site        ?? get().site,
+      group:       state.group       ?? get().group,
+      projectName: state.projectName ?? '',
+      engineer:    state.engineer    ?? '',
+      reference:   state.reference   ?? '',
+      date:        state.date        ?? today,
+    });
+  },
+
+  // ── Project CRUD ────────────────────────────────────────────────────────────
+
+  fetchProjects: async () => {
+    try {
+      const projects = await apiListProjects();
+      set({ projects });
+    } catch {
+      // ignore — user stays on project list with stale data
+    }
+  },
+
+  createProject: async (name, description) => {
+    const project = await apiCreateProject(name, description);
+    set((s) => ({
+      projects: [project, ...s.projects],
+      currentProjectId: project.id,
+      currentProjectName: project.name,
+    }));
+  },
+
+  saveCurrentProject: async () => {
+    const { currentProjectId } = get();
+    if (!currentProjectId) return;
+
+    // Collect state from all stores
+    const { useSeismicStore }    = await import('./seismicStore');
+    const { useStructuralStore } = await import('./structuralStore');
+
+    const blob: ProjectState = {
+      project:    get().serializeState(),
+      seismic:    useSeismicStore.getState().serializeState(),
+      structural: useStructuralStore.getState().serializeState(),
+    };
+
+    set({ isSaving: true });
+    try {
+      const updated = await apiSaveProjectState(currentProjectId, blob);
+      // Refresh the project summary in the list
+      set((s) => ({
+        projects: s.projects.map((p) =>
+          p.id === updated.id ? updated : p
+        ),
+        isSaving: false,
+      }));
+    } catch {
+      set({ isSaving: false });
+    }
+  },
+
+  loadProject: async (id) => {
+    const full = await apiGetProject(id);
+    set({ currentProjectId: full.id, currentProjectName: full.name });
+    return full.state;
+  },
+
+  deleteProject: async (id) => {
+    await apiDeleteProject(id);
+    set((s) => ({
+      projects: s.projects.filter((p) => p.id !== id),
+      ...(s.currentProjectId === id
+        ? { currentProjectId: null, currentProjectName: '' }
+        : {}),
+    }));
   },
 }));

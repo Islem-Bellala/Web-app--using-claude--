@@ -48,6 +48,8 @@ interface SeismicState {
   setBaseShear: (Vxd: string, Vyd: string) => void;
   setField: <K extends keyof SeismicState>(key: K, val: SeismicState[K]) => void;
   resetSeismic: () => void;
+  serializeState: () => Omit<SeismicState, 'setTwoDir' | 'setQFParams' | 'setRParams' | 'setPeriods' | 'setBaseShear' | 'setField' | 'resetSeismic' | 'serializeState' | 'hydrateState'>;
+  hydrateState: (state: Partial<SeismicState>) => void;
 }
 
 const DEF_QF_CHK: Record<string, boolean> = {
@@ -85,7 +87,7 @@ const initialState = {
   Vyd: '',
 };
 
-export const useSeismicStore = create<SeismicState>((set) => ({
+export const useSeismicStore = create<SeismicState>((set, get) => ({
   ...initialState,
 
   setTwoDir: (val) => set({ twoDir: val }),
@@ -95,4 +97,24 @@ export const useSeismicStore = create<SeismicState>((set) => ({
   setBaseShear: (Vxd, Vyd) => set({ Vxd, Vyd }),
   setField: (key, val) => set((state) => ({ ...state, [key]: val })),
   resetSeismic: () => set(initialState),
+
+  serializeState: () => {
+    const s = get();
+    return {
+      twoDir: s.twoDir,
+      QF: s.QF, QFx: s.QFx, QFy: s.QFy,
+      R: s.R, Rx: s.Rx, Ry: s.Ry,
+      selSys: s.selSys, selSysX: s.selSysX, selSysY: s.selSysY,
+      qfCat: s.qfCat, qfChk: s.qfChk,
+      qfCatX: s.qfCatX, qfChkX: s.qfChkX,
+      qfCatY: s.qfCatY, qfChkY: s.qfChkY,
+      frameSys: s.frameSys,
+      Tx: s.Tx, Ty: s.Ty,
+      Vxd: s.Vxd, Vyd: s.Vyd,
+    };
+  },
+
+  hydrateState: (state) => {
+    set((s) => ({ ...s, ...state }));
+  },
 }));

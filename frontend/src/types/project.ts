@@ -1,3 +1,47 @@
+// ── Project persistence (API / JSONB blob) ────────────────────────────────────
+
+export interface ProjectSummary {
+  id: string
+  name: string
+  description: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Shape of the JSONB state blob stored on the backend. */
+export interface ProjectState {
+  project: {
+    wilayaCode: string
+    commune: string
+    zone: string
+    site: string
+    group: string
+    projectName: string
+    engineer: string
+    reference: string
+    date: string
+  }
+  seismic: {
+    twoDir: boolean
+    QF: number; QFx: number; QFy: number
+    R: number;  Rx: number;  Ry: number
+    selSys: number; selSysX: number; selSysY: number
+    qfCat: string; qfChk: Record<string, boolean>
+    qfCatX: string; qfChkX: Record<string, boolean>
+    qfCatY: string; qfChkY: Record<string, boolean>
+    frameSys: string
+    Tx: string; Ty: string
+    Vxd: string; Vyd: string
+  }
+  structural: {
+    stories: Story[]
+  }
+}
+
+export interface ProjectFull extends ProjectSummary {
+  state: ProjectState | null
+}
+
 // ── Wilaya / Commune (Annex A) ────────────────────────────────────────────────
 
 export interface WilayaInfo {

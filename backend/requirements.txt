@@ -9,8 +9,14 @@
 fastapi==0.115.5
 uvicorn[standard]==0.32.0
 pydantic==2.10.3
+pydantic-settings>=2.0
 
-# Future sessions will add:
-# sqlalchemy       — database (Session: Projects/Models/Calculations)
-# alembic          — migrations
-# psycopg2-binary  — PostgreSQL driver
+# Database
+sqlalchemy[asyncio]>=2.0
+asyncpg                    # Async PostgreSQL driver
+alembic                    # Database migrations
+
+# Auth
+passlib[bcrypt]            # Password hashing (requires bcrypt<5.0.0 for passlib 1.7.4)
+bcrypt==4.0.1
+python-jose[cryptography]  # JWT tokens

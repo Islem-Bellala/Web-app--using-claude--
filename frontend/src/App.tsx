@@ -4,11 +4,14 @@
  * All state lives in Zustand stores.
  */
 
+import { useEffect } from 'react'
 import SpectrumChart from './components/seismic/SpectrumChart'
 import BaseShearPage from './components/seismic/BaseShearPage'
 import ProjectParams from './components/general/ProjectParams'
+import ProjectList from './components/general/ProjectList'
+import LoginPage from './components/auth/LoginPage'
 import type { AppColors } from './types'
-import { useUIStore } from './stores'
+import { useUIStore, useAuthStore, useProjectStore } from './stores'
 
 const DARK: AppColors = {
   bg:'#020817', surface:'#0a1628', elevated:'#0f172a',
@@ -41,7 +44,8 @@ const NAV: NavGroup[] = [
   {
     section: 'Général',
     items: [
-      { id:'params', label:'Paramètres généraux', icon:'⚙️', ready:true },
+      { id:'projects', label:'Projets',            icon:'📁', ready:true },
+      { id:'params',   label:'Paramètres généraux', icon:'⚙️', ready:true },
     ]
   },
   {
@@ -79,9 +83,10 @@ interface SidebarProps {
   c: AppColors;
   isDark: boolean;
   onToggleTheme: () => void;
+  onLogout: () => void;
 }
 
-function Sidebar({ activePage, onNavigate, c, isDark, onToggleTheme }: SidebarProps) {
+function Sidebar({ activePage, onNavigate, c, isDark, onToggleTheme, onLogout }: SidebarProps) {
   return (
     <aside style={{
       width:220, flexShrink:0,
@@ -145,7 +150,12 @@ function Sidebar({ activePage, onNavigate, c, isDark, onToggleTheme }: SidebarPr
         padding:'12px 18px', borderTop:`1px solid ${c.border}`,
         display:'flex', alignItems:'center', justifyContent:'space-between',
       }}>
-        <span style={{ fontSize:11, color:c.textMuted }}>v0.1.0</span>
+        <button type="button" onClick={onLogout} style={{
+          background:'none', border:'none', color:c.textMuted,
+          cursor:'pointer', fontSize:12, padding:0,
+        }}>
+          Déconnexion
+        </button>
         <button type="button" onClick={onToggleTheme} style={{
           background:c.elevated, border:`1px solid ${c.border}`,
           borderRadius:7, padding:'5px 10px', cursor:'pointer',
@@ -177,18 +187,40 @@ function ComingSoon({ c }: { c: AppColors }) {
 
 export default function App() {
   const { theme, activePage, setActivePage, toggleTheme } = useUIStore()
+  const { isAuthenticated, isLoading, checkAuth, logout } = useAuthStore()
+  const { currentProjectId, currentProjectName, isSaving, saveCurrentProject } = useProjectStore()
 
   const isDark = theme === 'dark'
   const c: AppColors = isDark ? DARK : LIGHT
 
+  // On mount: restore session from localStorage
+  useEffect(() => { checkAuth() }, [])
+
   function renderPage() {
     switch (activePage) {
+      case 'projects':   return <ProjectList   c={c} />
       case 'params':     return <ProjectParams c={c} />
       case 'spectrum':   return <SpectrumChart  c={c} isDark={isDark} />
       case 'base_shear': return <BaseShearPage  c={c} />
       default:           return <ComingSoon c={c} />
     }
   }
+
+  // ── Auth gate ──────────────────────────────────────────────────────────────
+
+  if (isLoading) {
+    return (
+      <div style={{ display:'flex', height:'100vh', alignItems:'center', justifyContent:'center', background:c.bg }}>
+        <span style={{ color:c.textMuted, fontSize:14 }}>Chargement…</span>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage c={c} isDark={isDark} />
+  }
+
+  // ── Authenticated app shell ───────────────────────────────────────────────
 
   return (
     <div style={{ display:'flex', height:'100vh', overflow:'hidden', background:c.bg }}>
@@ -198,9 +230,32 @@ export default function App() {
         c={c}
         isDark={isDark}
         onToggleTheme={toggleTheme}
+        onLogout={logout}
       />
-      <main style={{ flex:1, overflowY:'auto', background:c.bg, transition:'background 0.2s' }}>
-        {renderPage()}
+      <main style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background:c.bg, transition:'background 0.2s' }}>
+        {/* Save bar — only when a project is open */}
+        {currentProjectId && (
+          <div style={{
+            display:'flex', alignItems:'center', gap:12,
+            padding:'6px 20px', borderBottom:`1px solid ${c.border}`,
+            background:c.surface, flexShrink:0,
+          }}>
+            <span style={{ fontSize:12, color:c.textMuted }}>
+              Projet : <strong style={{ color:c.text }}>{currentProjectName}</strong>
+            </span>
+            <button type="button" onClick={saveCurrentProject} disabled={isSaving} style={{
+              background: isSaving ? c.borderLight : c.green,
+              border:'none', borderRadius:6, padding:'4px 12px',
+              color:'#fff', fontSize:12, fontWeight:600,
+              cursor: isSaving ? 'default' : 'pointer',
+            }}>
+              {isSaving ? 'Sauvegarde…' : 'Sauvegarder'}
+            </button>
+          </div>
+        )}
+        <div style={{ flex:1, overflowY:'auto' }}>
+          {renderPage()}
+        </div>
       </main>
     </div>
   )

@@ -1,0 +1,21 @@
+"""
+Bunyan — User ORM Model
+"""
+
+from sqlalchemy import Boolean, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from backend.models import Base
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    projects: Mapped[list["Project"]] = relationship(  # noqa: F821
+        "Project", back_populates="user", cascade="all, delete-orphan"
+    )

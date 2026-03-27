@@ -16,11 +16,27 @@ Architecture:
 CORS is configured via backend/config.py (reads from .env if present).
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import settings
 from backend.api.v1.router import api_router
+from backend.database import dispose_engine
+
+
+# =============================================================================
+# LIFESPAN — startup / shutdown
+# =============================================================================
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup — nothing to do yet (engine connects lazily)
+    yield
+    # shutdown — release connection pool
+    await dispose_engine()
 
 
 # =============================================================================
@@ -28,6 +44,7 @@ from backend.api.v1.router import api_router
 # =============================================================================
 
 app = FastAPI(
+    lifespan=lifespan,
     title       = settings.app_name,
     description = (
         "Calcul sismique et ferraillage BA selon RPA 2024, CBA93, BAEL91.\n\n"
@@ -47,7 +64,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins     = settings.cors_origins,
     allow_credentials = True,
-    allow_methods     = ["GET", "POST", "OPTIONS"],
+    allow_methods     = ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers     = ["Content-Type", "Authorization"],
 )
 
