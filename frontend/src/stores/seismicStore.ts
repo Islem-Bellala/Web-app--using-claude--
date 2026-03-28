@@ -48,7 +48,8 @@ interface SeismicState {
   setBaseShear: (Vxd: string, Vyd: string) => void;
   setField: <K extends keyof SeismicState>(key: K, val: SeismicState[K]) => void;
   resetSeismic: () => void;
-  serializeState: () => Omit<SeismicState, 'setTwoDir' | 'setQFParams' | 'setRParams' | 'setPeriods' | 'setBaseShear' | 'setField' | 'resetSeismic' | 'serializeState' | 'hydrateState'>;
+  resetState: () => void;
+  serializeState: () => Omit<SeismicState, 'setTwoDir' | 'setQFParams' | 'setRParams' | 'setPeriods' | 'setBaseShear' | 'setField' | 'resetSeismic' | 'resetState' | 'serializeState' | 'hydrateState'>;
   hydrateState: (state: Partial<SeismicState>) => void;
 }
 
@@ -97,6 +98,7 @@ export const useSeismicStore = create<SeismicState>((set, get) => ({
   setBaseShear: (Vxd, Vyd) => set({ Vxd, Vyd }),
   setField: (key, val) => set((state) => ({ ...state, [key]: val })),
   resetSeismic: () => set(initialState),
+  resetState: () => set(initialState),
 
   serializeState: () => {
     const s = get();

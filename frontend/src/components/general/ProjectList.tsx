@@ -7,8 +7,6 @@
 import { useEffect, useState } from 'react'
 import type { AppColors } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
-import { useSeismicStore } from '../../stores/seismicStore'
-import { useStructuralStore } from '../../stores/structuralStore'
 import { useUIStore } from '../../stores/uiStore'
 
 interface ProjectListProps {
@@ -19,8 +17,6 @@ export default function ProjectList({ c }: ProjectListProps) {
   const {
     projects, fetchProjects, createProject, loadProject, deleteProject, isSaving, currentProjectId,
   } = useProjectStore()
-  const { hydrateState: hydrateSeismic } = useSeismicStore()
-  const { hydrateState: hydrateStructural } = useStructuralStore()
   const { setActivePage } = useUIStore()
 
   const [newName, setNewName] = useState('')
@@ -46,17 +42,7 @@ export default function ProjectList({ c }: ProjectListProps) {
   async function handleOpen(id: string) {
     setLoading(true)
     try {
-      const state = await loadProject(id)
-      if (state) {
-        useProjectStore.getState().hydrateState(state.project)
-        hydrateSeismic(state.seismic)
-        hydrateStructural(state.structural)
-
-        // Re-fetch communes if wilaya has split zones (reference data not persisted)
-        const { wilayaCode, wilayas, fetchCommunes: fetchC } = useProjectStore.getState()
-        const wilaya = wilayas.find(w => w.code === wilayaCode)
-        if (wilaya?.has_split_zones) await fetchC(wilayaCode)
-      }
+      await loadProject(id)
       setActivePage('params')
     } finally {
       setLoading(false)

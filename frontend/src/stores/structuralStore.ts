@@ -10,6 +10,7 @@ interface StructuralState {
   updateStory: (id: number, field: keyof Story, value: string | number) => void;
   setStories: (stories: Story[]) => void;
   resetStories: () => void;
+  resetState: () => void;
   serializeState: () => { stories: Story[] };
   hydrateState: (state: { stories?: Story[] }) => void;
 }
@@ -59,6 +60,7 @@ export const useStructuralStore = create<StructuralState>((set, get) => ({
   setStories: (stories) => set({ stories }),
 
   resetStories: () => set({ stories: DEFAULT_STORIES }),
+  resetState: () => set({ stories: DEFAULT_STORIES }),
 
   serializeState: () => ({ stories: get().stories }),
 

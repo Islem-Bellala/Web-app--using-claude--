@@ -57,7 +57,7 @@ interface ProjectStore {
   fetchProjects: () => Promise<void>;
   createProject: (name: string, description?: string) => Promise<void>;
   saveCurrentProject: () => Promise<void>;
-  loadProject: (id: string) => Promise<ProjectState | null>;
+  loadProject: (id: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
 }
 
@@ -226,9 +226,39 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   loadProject: async (id) => {
+    const { useSeismicStore }    = await import('./seismicStore');
+    const { useStructuralStore } = await import('./structuralStore');
+
     const full = await apiGetProject(id);
-    set({ currentProjectId: full.id, currentProjectName: full.name });
-    return full.state;
+
+    // 1. Reset all stores to defaults before hydrating
+    useSeismicStore.getState().resetState();
+    useStructuralStore.getState().resetState();
+    set({
+      ...initialState,
+      wilayas:            get().wilayas,   // keep loaded reference data
+      currentProjectId:   full.id,
+      currentProjectName: full.name,
+    });
+
+    const state = full.state;
+    if (!state) return;  // new/empty project — defaults already applied
+
+    // 2. Hydrate each store from saved state
+    if (state.project)    get().hydrateState(state.project);
+    if (state.seismic)    useSeismicStore.getState().hydrateState(state.seismic);
+    if (state.structural) useStructuralStore.getState().hydrateState(state.structural);
+
+    // 3. Re-derive reference data (communes dropdown + zone)
+    const { wilayaCode, wilayas } = get();
+    if (wilayaCode) {
+      const wilaya = wilayas.find((w) => w.code === wilayaCode);
+      if (wilaya?.has_split_zones) {
+        await get().fetchCommunes(wilayaCode);
+      }
+      const { commune } = get();
+      await get().deriveZone(wilayaCode, commune || undefined);
+    }
   },
 
   deleteProject: async (id) => {
