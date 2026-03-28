@@ -1,0 +1,105 @@
+/* ── Google Fonts ────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;700&display=swap');
+
+@import "tailwindcss";
+
+/* ── Dark mode via .dark class on <html> ─────────────────────────────────── */
+@variant dark (&:where(.dark, .dark *));
+
+/* ── Atlas theme tokens ──────────────────────────────────────────────────── */
+@theme {
+  /* Fonts */
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+
+  /* Surfaces — light */
+  --color-atlas-bg:      #faf8f4;
+  --color-atlas-card:    #ffffff;
+  --color-atlas-sidebar: #f0ece4;
+  --color-atlas-topbar:  #2e3a2e;
+
+  /* Surfaces — dark */
+  --color-atlas-dark-bg:      #1a1e1a;
+  --color-atlas-dark-card:    #242a24;
+  --color-atlas-dark-sidebar: #1e231e;
+  --color-atlas-dark-topbar:  #141814;
+
+  /* Accent */
+  --color-atlas-gold:        #d4a54a;
+  --color-atlas-green:       #2e3a2e;
+  --color-atlas-green-muted: #4a6a4a;
+
+  /* Text — light */
+  --color-atlas-text:        #2e2a24;
+  --color-atlas-text-sec:    #8a8478;
+  --color-atlas-text-muted:  #b0a898;
+  --color-atlas-border:      #e0dcd2;
+  --color-atlas-card-border: #e8e4da;
+
+  /* Text — dark */
+  --color-atlas-dark-text:        #e0ddd5;
+  --color-atlas-dark-text-sec:    #8a9a8a;
+  --color-atlas-dark-text-muted:  #5a6a5a;
+  --color-atlas-dark-border:      #2e382e;
+  --color-atlas-dark-card-border: #3a443a;
+
+  /* Semantic */
+  --color-atlas-success: #4a8a5a;
+  --color-atlas-warning: #d4a54a;
+  --color-atlas-danger:  #c45a4a;
+  --color-atlas-info:    #4a8ac4;
+}
+
+/* ── Component utilities ─────────────────────────────────────────────────── */
+@layer utilities {
+  .font-arabic {
+    font-family: 'Noto Sans Arabic', 'IBM Plex Sans', sans-serif;
+  }
+}
+
+/* ── Base styles ─────────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    height: 100%;
+    overflow: hidden;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    background-color: #faf8f4;
+    color: #2e2a24;
+  }
+
+  html.dark {
+    background-color: #1a1e1a;
+    color: #e0ddd5;
+  }
+
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  select {
+    font-family: inherit;
+  }
+}
+
+/* ── Scrollbars ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #e0dcd2; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #b0a898; }
+
+html.dark ::-webkit-scrollbar-thumb { background: #2e382e; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #5a6a5a; }

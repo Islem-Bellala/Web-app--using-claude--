@@ -1,17 +1,12 @@
 /**
- * RModal — Coefficient de Comportement R
- * Extracted from SpectrumChart.jsx — shared by ProjectParams and SpectrumChart.
+ * RModal — Coefficient de Comportement R (Phase 6: Atlas theme)
  * RPA 2024 §3.5 — Table 3.18
  */
 import { useState } from "react"
-import type { AppColors } from "../../types"
 
-// ── Static data ──────────────────────────────────────────────────────────────
+// ── Static data ───────────────────────────────────────────────────────────────
 
-interface ForceRatios {
-  ossature: number;
-  voiles: number;
-}
+interface ForceRatios { ossature: number; voiles: number }
 
 export interface BracingSystem {
   id: number;
@@ -23,42 +18,12 @@ export interface BracingSystem {
 }
 
 export const SYSTEMS: BracingSystem[] = [
-  {
-    id:1, label:"Système 1 — Ossature",
-    desc:"Ossature (portiques). Vossature > 65% Vbase.",
-    R:5.5, qfCat:"a",
-    detect: r => r.ossature > 0.65,
-  },
-  {
-    id:2, label:"Système 2 — Mixte équiv. ossature",
-    desc:"Mixte. L'ossature reprend 50% à 65% de l'effort tranchant.",
-    R:5.5, qfCat:"a",
-    detect: r => r.ossature >= 0.50 && r.ossature <= 0.65,
-  },
-  {
-    id:3, label:"Système 3 — Ossature + remplissage",
-    desc:"Ossature ou mixte avec remplissage en maçonnerie rigide (≤ 10 cm).",
-    R:3.5, qfCat:"a",
-    detect: null,
-  },
-  {
-    id:4, label:"Système 4 — Mixte équiv. voiles",
-    desc:"Les voiles reprennent 50% à 65% de l'effort tranchant.",
-    R:4.5, qfCat:"b",
-    detect: r => r.voiles >= 0.50 && r.voiles <= 0.65,
-  },
-  {
-    id:5, label:"Système 5 — Voiles",
-    desc:"Contreventement par voiles. Vvoiles > 65% Vbase.",
-    R:4.5, qfCat:"b",
-    detect: r => r.voiles > 0.65,
-  },
-  {
-    id:6, label:"Système 6 — Noyau / Effet noyau",
-    desc:"Système à noyau ou à effet noyau. rx, ry ≤ rayon de giration ls.",
-    R:3.0, qfCat:"b",
-    detect: null,
-  },
+  { id:1, label:"Système 1 — Ossature",           desc:"Ossature (portiques). Vossature > 65% Vbase.",                          R:5.5, qfCat:"a", detect: r => r.ossature > 0.65 },
+  { id:2, label:"Système 2 — Mixte équiv. ossature", desc:"Mixte. L'ossature reprend 50% à 65% de l'effort tranchant.",        R:5.5, qfCat:"a", detect: r => r.ossature >= 0.50 && r.ossature <= 0.65 },
+  { id:3, label:"Système 3 — Ossature + remplissage",desc:"Ossature ou mixte avec remplissage en maçonnerie rigide (≤ 10 cm).", R:3.5, qfCat:"a", detect: null },
+  { id:4, label:"Système 4 — Mixte équiv. voiles",   desc:"Les voiles reprennent 50% à 65% de l'effort tranchant.",            R:4.5, qfCat:"b", detect: r => r.voiles >= 0.50 && r.voiles <= 0.65 },
+  { id:5, label:"Système 5 — Voiles",                desc:"Contreventement par voiles. Vvoiles > 65% Vbase.",                   R:4.5, qfCat:"b", detect: r => r.voiles > 0.65 },
+  { id:6, label:"Système 6 — Noyau / Effet noyau",   desc:"Système à noyau ou à effet noyau. rx, ry ≤ rayon de giration ls.",  R:3.0, qfCat:"b", detect: null },
 ]
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -67,12 +32,13 @@ interface RModalProps {
   onClose: () => void;
   onValidate: (r: number | undefined, sys: BracingSystem | null | undefined) => void;
   initSystem: number;
-  c: AppColors;
+  /** @deprecated will be removed in next cleanup pass */
+  c?: unknown;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function RModal({ onClose, onValidate, initSystem, c }: RModalProps) {
+export default function RModal({ onClose, onValidate, initSystem }: RModalProps) {
   const [tab,    setTab]    = useState<string>("manual")
   const [selSys, setSelSys] = useState<number>(initSystem || 1)
   const [Voss,   setVoss]   = useState<string>("")
@@ -80,7 +46,7 @@ export default function RModal({ onClose, onValidate, initSystem, c }: RModalPro
   const [Vtot,   setVtot]   = useState<string>("")
   const [detSys, setDetSys] = useState<BracingSystem | null>(null)
 
-  const activeSys: BracingSystem | undefined | null = tab === "manual"
+  const activeSys = tab === "manual"
     ? SYSTEMS.find(s => s.id === selSys)
     : detSys
 
@@ -88,74 +54,87 @@ export default function RModal({ onClose, onValidate, initSystem, c }: RModalPro
     const vo = parseFloat(Voss), vv = parseFloat(Vvoi), vt = parseFloat(Vtot)
     if (isNaN(vt) || vt <= 0) return
     const ratio: ForceRatios = { ossature:(isNaN(vo)?0:vo)/vt, voiles:(isNaN(vv)?0:vv)/vt }
-    const found = SYSTEMS.find(s => s.detect && s.detect(ratio))
-    setDetSys(found ?? null)
+    setDetSys(SYSTEMS.find(s => s.detect && s.detect(ratio)) ?? null)
   }
 
-  return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.72)",
-      zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{background:c.surface,border:`1px solid ${c.border}`,
-        borderRadius:14,padding:26,width:520,maxWidth:"95vw",
-        maxHeight:"90vh",overflowY:"auto",
-        boxShadow:"0 24px 48px rgba(0,0,0,0.4)"}}>
+  const inputCls = `w-full px-2.5 py-2 rounded-md text-sm font-mono outline-none transition-colors
+    bg-atlas-bg dark:bg-atlas-dark-bg
+    border border-atlas-border dark:border-atlas-dark-border
+    text-atlas-text dark:text-atlas-dark-text
+    focus:border-atlas-gold focus:ring-1 focus:ring-atlas-gold/20`
 
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18}}>
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-lg bg-atlas-card dark:bg-atlas-dark-card border border-atlas-card-border dark:border-atlas-dark-card-border rounded-xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+
+        {/* ── Header ────────────────────────────────────────────────── */}
+        <div className="flex justify-between items-start mb-5">
           <div>
-            <div style={{fontSize:11,letterSpacing:"0.1em",color:c.blue,textTransform:"uppercase",marginBottom:3}}>
+            <div className="text-[11px] uppercase tracking-[0.1em] text-atlas-info font-semibold mb-0.5">
               RPA 2024 — §3.5 — Table 3.18
             </div>
-            <h2 style={{fontSize:17,fontWeight:700,color:c.text,margin:0}}>
+            <h2 className="text-[17px] font-bold text-atlas-text dark:text-atlas-dark-text">
               Coefficient de Comportement R
             </h2>
-            <div style={{fontSize:12,color:c.textMuted,marginTop:2}}>Identification du système de contreventement</div>
+            <p className="text-xs text-atlas-text-muted dark:text-atlas-dark-text-muted mt-0.5">
+              Identification du système de contreventement
+            </p>
           </div>
-          <button type="button" onClick={onClose} style={{background:"none",border:"none",color:c.textMuted,fontSize:20,cursor:"pointer"}}>✕</button>
+          <button type="button" onClick={onClose}
+            className="text-atlas-text-muted dark:text-atlas-dark-text-muted hover:text-atlas-text dark:hover:text-atlas-dark-text text-xl leading-none transition-colors cursor-pointer">
+            ✕
+          </button>
         </div>
 
-        {/* Mode tabs */}
-        <div style={{display:"flex",gap:7,marginBottom:16}}>
+        {/* ── Mode tabs ──────────────────────────────────────────────── */}
+        <div className="flex gap-1.5 mb-4">
           {[{id:"manual",l:"🏗️ Sélection manuelle"},
             {id:"forces",l:"📊 Par effort tranchant"}].map(t => (
-            <button type="button" key={t.id} onClick={() => setTab(t.id)} style={{
-              flex:1,padding:"9px",borderRadius:8,cursor:"pointer",
-              border:`1px solid ${tab===t.id ? c.blue : c.border}`,
-              background:tab===t.id ? c.blue+"22" : c.elevated,
-              color:tab===t.id ? c.blue : c.textSec,
-              fontSize:13,fontWeight:tab===t.id ? 700 : 400}}>
+            <button type="button" key={t.id} onClick={() => setTab(t.id)}
+              className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer border ${
+                tab === t.id
+                  ? 'border-atlas-gold bg-atlas-gold/15 text-atlas-gold font-bold'
+                  : 'border-atlas-border dark:border-atlas-dark-border bg-atlas-bg dark:bg-atlas-dark-bg text-atlas-text-sec dark:text-atlas-dark-text-sec hover:border-atlas-gold/40'
+              }`}>
               {t.l}
             </button>
           ))}
         </div>
 
+        {/* ── Manual selection ───────────────────────────────────────── */}
         {tab === "manual" && (
-          <div style={{marginBottom:16}}>
+          <div className="mb-4">
             {SYSTEMS.map(sys => (
               <div key={sys.id} onClick={() => setSelSys(sys.id)}
-                style={{display:"flex",alignItems:"flex-start",gap:11,
-                  padding:"10px 12px",borderRadius:8,cursor:"pointer",marginBottom:5,
-                  background:selSys===sys.id ? c.blue+"15" : c.elevated,
-                  border:`1px solid ${selSys===sys.id ? c.blue : c.border}`}}>
-                <div style={{width:20,height:20,borderRadius:"50%",flexShrink:0,
-                  border:`2px solid ${selSys===sys.id ? c.blue : c.borderLight}`,
-                  background:selSys===sys.id ? c.blue : "transparent",
-                  display:"flex",alignItems:"center",justifyContent:"center",
-                  fontSize:11,color:"white",fontWeight:700,marginTop:1}}>
-                  {selSys===sys.id ? "●" : ""}
+                className={`flex items-start gap-3 px-3 py-2.5 rounded-lg cursor-pointer mb-1.5 border transition-colors ${
+                  selSys === sys.id
+                    ? 'bg-atlas-gold/8 border-atlas-gold/40'
+                    : 'bg-atlas-bg dark:bg-atlas-dark-bg border-atlas-border dark:border-atlas-dark-border hover:border-atlas-gold/30'
+                }`}>
+                {/* Radio dot */}
+                <div className={`w-5 h-5 rounded-full flex-shrink-0 mt-0.5 border-2 flex items-center justify-center text-[11px] font-bold text-white transition-colors ${
+                  selSys === sys.id
+                    ? 'bg-atlas-gold border-atlas-gold'
+                    : 'bg-transparent border-atlas-border dark:border-atlas-dark-border'
+                }`}>
+                  {selSys === sys.id ? "●" : ""}
                 </div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:13,fontWeight:600,color:c.text,marginBottom:2}}>
+                <div className="flex-1">
+                  <div className="text-sm font-semibold text-atlas-text dark:text-atlas-dark-text mb-0.5">
                     {sys.label}
-                    <span style={{marginLeft:8,fontSize:11,
-                      color:sys.qfCat==="a" ? c.blue : c.purple,
-                      background:(sys.qfCat==="a" ? c.blue : c.purple)+"22",
-                      borderRadius:4,padding:"1px 5px"}}>
+                    <span className={`ml-2 text-[11px] rounded px-1.5 py-0.5 ${
+                      sys.qfCat === 'a'
+                        ? 'text-atlas-info bg-atlas-info/15'
+                        : 'text-atlas-text-sec dark:text-atlas-dark-text-sec bg-atlas-border/50 dark:bg-atlas-dark-border/50'
+                    }`}>
                       Cat. ({sys.qfCat})
                     </span>
                   </div>
-                  <div style={{fontSize:11,color:c.textMuted,lineHeight:1.5}}>{sys.desc}</div>
+                  <div className="text-[11px] text-atlas-text-muted dark:text-atlas-dark-text-muted leading-relaxed">
+                    {sys.desc}
+                  </div>
                 </div>
-                <div style={{fontSize:18,fontWeight:700,color:c.amber,fontFamily:"monospace",flexShrink:0}}>
+                <div className="text-lg font-bold font-mono text-atlas-gold flex-shrink-0">
                   R={sys.R}
                 </div>
               </div>
@@ -163,79 +142,79 @@ export default function RModal({ onClose, onValidate, initSystem, c }: RModalPro
           </div>
         )}
 
+        {/* ── Detection by forces ────────────────────────────────────── */}
         {tab === "forces" && (
-          <div style={{marginBottom:16}}>
-            <div style={{background:c.elevated,border:`1px solid ${c.border}`,
-              borderRadius:8,padding:"9px 13px",marginBottom:14,
-              display:"flex",alignItems:"center",gap:10}}>
-              <div style={{width:8,height:8,borderRadius:"50%",background:c.borderLight,flexShrink:0}}/>
-              <span style={{fontSize:12,color:c.textMuted,flex:1}}>
+          <div className="mb-4">
+            {/* Connection status */}
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg mb-4 bg-atlas-bg dark:bg-atlas-dark-bg border border-atlas-border dark:border-atlas-dark-border">
+              <div className="w-2 h-2 rounded-full bg-atlas-text-muted dark:bg-atlas-dark-text-muted flex-shrink-0"/>
+              <span className="text-xs text-atlas-text-muted dark:text-atlas-dark-text-muted flex-1">
                 Robot non connecté — import automatique indisponible
               </span>
-              <button type="button" style={{padding:"5px 11px",borderRadius:6,cursor:"not-allowed",
-                background:c.border,border:"none",color:c.textMuted,fontSize:11}}>
+              <button type="button" disabled
+                className="px-2.5 py-1 rounded text-[11px] bg-atlas-border/50 dark:bg-atlas-dark-border text-atlas-text-muted dark:text-atlas-dark-text-muted cursor-not-allowed">
                 Connecter
               </button>
             </div>
 
-            <div style={{display:"flex",gap:10,marginBottom:12}}>
+            {/* Force inputs */}
+            <div className="flex gap-2.5 mb-3">
               {([{label:"V ossature (kN)",val:Voss,set:setVoss},
-                {label:"V voiles (kN)",  val:Vvoi,set:setVvoi},
-                {label:"V total (kN)",   val:Vtot,set:setVtot}] as const).map(f => (
-                <div key={f.label} style={{flex:1}}>
-                  <div style={{fontSize:11,color:c.textMuted,marginBottom:4}}>{f.label}</div>
+                 {label:"V voiles (kN)",  val:Vvoi,set:setVvoi},
+                 {label:"V total (kN)",   val:Vtot,set:setVtot}] as const).map(f => (
+                <div key={f.label} className="flex-1">
+                  <div className="text-[11px] text-atlas-text-muted dark:text-atlas-dark-text-muted mb-1">{f.label}</div>
                   <input type="number" min={0} value={f.val}
                     onChange={e => f.set(e.target.value)}
-                    style={{width:"100%",background:c.elevated,border:`1px solid ${c.border}`,
-                      borderRadius:7,padding:"8px 10px",color:c.text,
-                      fontSize:15,fontFamily:"monospace",outline:"none"}}/>
+                    className={inputCls}/>
                 </div>
               ))}
             </div>
 
-            <button type="button" onClick={detectFromForces} style={{
-              width:"100%",padding:"9px",borderRadius:8,cursor:"pointer",
-              background:c.blue,border:"none",color:"white",fontSize:13,fontWeight:700,marginBottom:10}}>
+            <button type="button" onClick={detectFromForces}
+              className="w-full py-2.5 mb-2.5 rounded-lg text-sm font-bold transition-colors cursor-pointer
+                bg-atlas-topbar dark:bg-atlas-dark-topbar text-atlas-gold border border-atlas-gold/40 hover:bg-atlas-topbar/80">
               Détecter le système automatiquement
             </button>
 
             {detSys ? (
-              <div style={{background:c.green+"11",border:`1px solid ${c.green}44`,borderRadius:8,padding:"11px 13px"}}>
-                <div style={{fontSize:12,color:c.green,marginBottom:3}}>✅ Système identifié</div>
-                <div style={{fontSize:14,fontWeight:700,color:c.text}}>{detSys.label}</div>
+              <div className="px-3 py-2.5 rounded-lg bg-atlas-success/10 border border-atlas-success/30">
+                <div className="text-xs text-atlas-success mb-0.5">✅ Système identifié</div>
+                <div className="text-sm font-bold text-atlas-text dark:text-atlas-dark-text">{detSys.label}</div>
               </div>
-            ) : (Voss||Vvoi||Vtot) ? (
-              <div style={{background:c.amber+"11",border:`1px solid ${c.amber}44`,borderRadius:8,padding:"10px 13px",fontSize:12,color:c.amber}}>
+            ) : (Voss || Vvoi || Vtot) ? (
+              <div className="px-3 py-2.5 rounded-lg text-xs bg-atlas-warning/10 border border-atlas-warning/30 text-atlas-warning">
                 ⚠️ Système 3 ou 6 — sélection manuelle requise
               </div>
             ) : null}
           </div>
         )}
 
+        {/* ── Active system summary ──────────────────────────────────── */}
         {activeSys && (
-          <div style={{background:c.elevated,border:`1px solid ${c.amber}44`,
-            borderRadius:10,padding:"14px 16px",marginBottom:16,
-            display:"flex",alignItems:"center",gap:16}}>
-            <div style={{flex:1}}>
-              <div style={{fontSize:11,color:c.textMuted,marginBottom:2}}>Valeur R — {activeSys.label}</div>
-              <div style={{fontSize:11,color:c.textMuted}}>
+          <div className="flex items-center gap-4 bg-atlas-bg dark:bg-atlas-dark-bg border border-atlas-gold/30 rounded-xl px-4 py-3 mb-4">
+            <div className="flex-1">
+              <div className="text-[11px] text-atlas-text-muted dark:text-atlas-dark-text-muted mb-0.5">
+                Valeur R — {activeSys.label}
+              </div>
+              <div className="text-[11px] text-atlas-text-muted dark:text-atlas-dark-text-muted">
                 Cat. Q<sub>F</sub> :&nbsp;
-                <b style={{color:activeSys.qfCat==="a" ? c.blue : c.purple}}>({activeSys.qfCat})</b>
+                <b className={activeSys.qfCat === 'a' ? 'text-atlas-info' : 'text-atlas-text-sec dark:text-atlas-dark-text-sec'}>
+                  ({activeSys.qfCat})
+                </b>
               </div>
             </div>
-            <div style={{fontSize:42,fontWeight:700,fontFamily:"monospace",color:c.amber}}>
-              {activeSys.R}
-            </div>
+            <div className="text-5xl font-bold font-mono text-atlas-gold">{activeSys.R}</div>
           </div>
         )}
 
+        {/* ── Validate button ────────────────────────────────────────── */}
         <button type="button"
           onClick={() => onValidate(activeSys?.R, activeSys)}
           disabled={!activeSys}
-          style={{width:"100%",padding:"11px",borderRadius:8,
-            cursor:activeSys ? "pointer" : "not-allowed",
-            background:activeSys ? c.blue : c.border,
-            border:"none",color:"white",fontSize:14,fontWeight:700}}>
+          className="w-full py-2.5 rounded-lg text-sm font-bold transition-colors
+            bg-atlas-gold text-atlas-green hover:bg-atlas-gold/90
+            disabled:opacity-50 disabled:cursor-not-allowed">
           {activeSys ? `Valider R = ${activeSys.R}` : "Sélectionner un système d'abord"}
         </button>
       </div>

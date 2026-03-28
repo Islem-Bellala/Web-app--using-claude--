@@ -1,23 +1,16 @@
 /**
- * Bunyan — Login / Register Page
+ * Bunyan — Login / Register Page (Phase 6: Atlas theme)
  * Full-page auth form. NOT inside the sidebar+topbar shell.
- * French UI text, works with dark/light theme system.
  */
 
 import { useState } from 'react'
 import { useAuthStore } from '../../stores/authStore'
-import type { AppColors } from '../../types'
 
-interface LoginPageProps {
-  c: AppColors
-  isDark: boolean
-}
-
-export default function LoginPage({ c, isDark }: LoginPageProps) {
-  const [mode, setMode]           = useState<'login' | 'register'>('login')
-  const [email, setEmail]         = useState('')
-  const [password, setPassword]   = useState('')
-  const [fullName, setFullName]   = useState('')
+export default function LoginPage() {
+  const [mode, setMode]         = useState<'login' | 'register'>('login')
+  const [email, setEmail]       = useState('')
+  const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
 
   const { login, register, isLoading, error, clearError } = useAuthStore()
 
@@ -35,128 +28,101 @@ export default function LoginPage({ c, isDark }: LoginPageProps) {
     }
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '10px 12px',
-    background: c.elevated,
-    border: `1px solid ${c.border}`,
-    borderRadius: 8,
-    color: c.text,
-    fontSize: 14,
-    outline: 'none',
-    boxSizing: 'border-box',
-  }
-
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: 12,
-    color: c.textSec,
-    marginBottom: 5,
-  }
-
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: c.bg,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 20,
-    }}>
-      <div style={{
-        background: c.surface,
-        border: `1px solid ${c.border}`,
-        borderRadius: 14,
-        padding: '36px 32px',
-        width: '100%',
-        maxWidth: 380,
-      }}>
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: c.text, letterSpacing: '-0.02em' }}>
-            StructCalc
+    <div className="min-h-screen w-screen flex items-center justify-center p-5 bg-atlas-bg dark:bg-atlas-dark-bg">
+      <div className="w-full max-w-sm bg-atlas-card dark:bg-atlas-dark-card border border-atlas-card-border dark:border-atlas-dark-card-border rounded-xl px-8 py-9">
+
+        {/* ── Logo / header ────────────────────────────────────────── */}
+        <div className="text-center mb-7">
+          {/* Green badge with logo */}
+          <div className="inline-flex items-center gap-2 bg-atlas-topbar dark:bg-atlas-dark-topbar px-4 py-2 rounded-lg mb-4">
+            <span className="text-atlas-gold font-bold text-lg font-arabic">بنيان</span>
+            <span className="text-atlas-gold font-semibold text-sm tracking-wide">Bunyan</span>
           </div>
-          <div style={{ fontSize: 11, color: c.textMuted, marginTop: 3 }}>
-            RPA 2024 · CBA93 · BAEL91
-          </div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: c.text, marginTop: 18 }}>
+          <p className="text-xs text-atlas-text-muted dark:text-atlas-dark-text-muted tracking-wide">
+            Plateforme de vérification structurelle
+          </p>
+          <h1 className="mt-5 text-base font-semibold text-atlas-text dark:text-atlas-dark-text">
             {mode === 'login' ? 'Connexion' : 'Inscription'}
-          </div>
+          </h1>
         </div>
 
-        {/* Error */}
+        {/* ── Error message ─────────────────────────────────────────── */}
         {error && (
-          <div style={{
-            background: isDark ? '#3b0f0f' : '#fef2f2',
-            border: `1px solid ${c.red}`,
-            borderRadius: 8,
-            padding: '10px 12px',
-            fontSize: 13,
-            color: c.red,
-            marginBottom: 18,
-          }}>
+          <div className="mb-4 px-3 py-2.5 rounded-lg border border-atlas-danger/50 bg-atlas-danger/10 text-atlas-danger text-xs">
             {error}
           </div>
         )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* ── Form ─────────────────────────────────────────────────── */}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {mode === 'register' && (
             <div>
-              <label style={labelStyle}>Nom complet</label>
+              <label className="block text-xs text-atlas-text-sec dark:text-atlas-dark-text-sec mb-1.5">
+                Nom complet
+              </label>
               <input
                 type="text"
                 value={fullName}
                 onChange={e => setFullName(e.target.value)}
                 placeholder="Optionnel"
-                style={inputStyle}
                 autoComplete="name"
+                className="w-full px-3 py-2.5 rounded-md text-sm
+                  bg-atlas-bg dark:bg-atlas-dark-bg
+                  border border-atlas-border dark:border-atlas-dark-border
+                  text-atlas-text dark:text-atlas-dark-text
+                  placeholder:text-atlas-text-muted dark:placeholder:text-atlas-dark-text-muted
+                  outline-none focus:border-atlas-gold focus:ring-1 focus:ring-atlas-gold/30 transition-colors"
               />
             </div>
           )}
 
           <div>
-            <label style={labelStyle}>Adresse e-mail</label>
+            <label className="block text-xs text-atlas-text-sec dark:text-atlas-dark-text-sec mb-1.5">
+              Adresse e-mail
+            </label>
             <input
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
               placeholder="vous@exemple.com"
-              style={inputStyle}
               autoComplete="email"
+              className="w-full px-3 py-2.5 rounded-md text-sm
+                bg-atlas-bg dark:bg-atlas-dark-bg
+                border border-atlas-border dark:border-atlas-dark-border
+                text-atlas-text dark:text-atlas-dark-text
+                placeholder:text-atlas-text-muted dark:placeholder:text-atlas-dark-text-muted
+                outline-none focus:border-atlas-gold focus:ring-1 focus:ring-atlas-gold/30 transition-colors"
             />
           </div>
 
           <div>
-            <label style={labelStyle}>Mot de passe</label>
+            <label className="block text-xs text-atlas-text-sec dark:text-atlas-dark-text-sec mb-1.5">
+              Mot de passe
+            </label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
               placeholder="••••••••"
-              style={inputStyle}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              className="w-full px-3 py-2.5 rounded-md text-sm
+                bg-atlas-bg dark:bg-atlas-dark-bg
+                border border-atlas-border dark:border-atlas-dark-border
+                text-atlas-text dark:text-atlas-dark-text
+                placeholder:text-atlas-text-muted dark:placeholder:text-atlas-dark-text-muted
+                outline-none focus:border-atlas-gold focus:ring-1 focus:ring-atlas-gold/30 transition-colors"
             />
           </div>
 
           <button
             type="submit"
             disabled={isLoading}
-            style={{
-              width: '100%',
-              padding: '11px',
-              background: isLoading ? c.borderLight : c.blue,
-              border: 'none',
-              borderRadius: 8,
-              color: '#fff',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: isLoading ? 'default' : 'pointer',
-              marginTop: 4,
-              transition: 'background 0.15s',
-            }}
+            className="w-full mt-1 py-2.5 rounded-md text-sm font-semibold transition-colors
+              bg-atlas-gold text-atlas-green hover:bg-atlas-gold/90
+              disabled:opacity-60 disabled:cursor-default"
           >
             {isLoading
               ? 'Chargement…'
@@ -164,30 +130,26 @@ export default function LoginPage({ c, isDark }: LoginPageProps) {
           </button>
         </form>
 
-        {/* Toggle */}
-        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: c.textMuted }}>
+        {/* ── Mode toggle ───────────────────────────────────────────── */}
+        <p className="text-center mt-5 text-xs text-atlas-text-muted dark:text-atlas-dark-text-muted">
           {mode === 'login' ? (
             <>
               Pas de compte ?{' '}
-              <button type="button" onClick={handleToggle} style={{
-                background: 'none', border: 'none', color: c.blue,
-                cursor: 'pointer', fontSize: 13, padding: 0,
-              }}>
+              <button type="button" onClick={handleToggle}
+                className="text-atlas-gold hover:underline cursor-pointer">
                 Inscrivez-vous
               </button>
             </>
           ) : (
             <>
               Déjà inscrit ?{' '}
-              <button type="button" onClick={handleToggle} style={{
-                background: 'none', border: 'none', color: c.blue,
-                cursor: 'pointer', fontSize: 13, padding: 0,
-              }}>
+              <button type="button" onClick={handleToggle}
+                className="text-atlas-gold hover:underline cursor-pointer">
                 Connectez-vous
               </button>
             </>
           )}
-        </div>
+        </p>
       </div>
     </div>
   )

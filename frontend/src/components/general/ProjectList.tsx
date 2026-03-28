@@ -1,27 +1,20 @@
 /**
- * Bunyan — Project List Page
- * Shows the user's projects; allows create, open, delete.
- * Navigates to ProjectParams after creating or opening a project.
+ * Bunyan — Project List Page (Phase 6: Atlas theme)
  */
 
 import { useEffect, useState } from 'react'
-import type { AppColors } from '../../types'
 import { useProjectStore } from '../../stores/projectStore'
 import { useUIStore } from '../../stores/uiStore'
 
-interface ProjectListProps {
-  c: AppColors
-}
-
-export default function ProjectList({ c }: ProjectListProps) {
+export default function ProjectList() {
   const {
     projects, fetchProjects, createProject, loadProject, deleteProject, isSaving, currentProjectId,
   } = useProjectStore()
   const { setActivePage } = useUIStore()
 
-  const [newName, setNewName] = useState('')
-  const [creating, setCreating] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [newName, setNewName]         = useState('')
+  const [creating, setCreating]       = useState(false)
+  const [loading, setLoading]         = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   useEffect(() => { fetchProjects() }, [])
@@ -61,121 +54,129 @@ export default function ProjectList({ c }: ProjectListProps) {
   }
 
   return (
-    <div style={{ padding: 32, maxWidth: 700 }}>
-      <h2 style={{ fontSize: 20, fontWeight: 700, color: c.text, marginBottom: 24 }}>
+    <div className="p-8 max-w-2xl">
+      <h2 className="text-xl font-bold text-atlas-text dark:text-atlas-dark-text mb-6">
         Mes projets
       </h2>
 
-      {/* New project form */}
-      <form onSubmit={handleCreate} style={{ display: 'flex', gap: 10, marginBottom: 28 }}>
+      {/* ── New project form ─────────────────────────────────────────── */}
+      <form onSubmit={handleCreate} className="flex gap-2.5 mb-7">
         <input
           type="text"
           value={newName}
           onChange={e => setNewName(e.target.value)}
           placeholder="Nom du nouveau projet…"
-          style={{
-            flex: 1, padding: '9px 12px',
-            background: c.elevated, border: `1px solid ${c.border}`,
-            borderRadius: 8, color: c.text, fontSize: 14, outline: 'none',
-          }}
+          className="flex-1 px-3 py-2 rounded-lg text-sm
+            bg-atlas-card dark:bg-atlas-dark-card
+            border border-atlas-border dark:border-atlas-dark-border
+            text-atlas-text dark:text-atlas-dark-text
+            placeholder:text-atlas-text-muted dark:placeholder:text-atlas-dark-text-muted
+            outline-none focus:border-atlas-gold focus:ring-1 focus:ring-atlas-gold/30 transition-colors"
         />
         <button
           type="submit"
           disabled={creating || !newName.trim()}
-          style={{
-            padding: '9px 18px',
-            background: creating || !newName.trim() ? c.borderLight : c.blue,
-            border: 'none', borderRadius: 8,
-            color: '#fff', fontSize: 14, fontWeight: 600,
-            cursor: creating || !newName.trim() ? 'default' : 'pointer',
-          }}
+          className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors
+            bg-atlas-gold text-atlas-green hover:bg-atlas-gold/90
+            disabled:opacity-50 disabled:cursor-default"
         >
           {creating ? '…' : 'Nouveau projet'}
         </button>
       </form>
 
-      {/* Project list */}
+      {/* ── Loading indicator ────────────────────────────────────────── */}
       {loading && (
-        <div style={{ color: c.textMuted, fontSize: 13, marginBottom: 16 }}>Chargement…</div>
+        <p className="text-xs text-atlas-text-muted dark:text-atlas-dark-text-muted mb-4">
+          Chargement…
+        </p>
       )}
 
+      {/* ── Empty state ──────────────────────────────────────────────── */}
       {projects.length === 0 && !loading ? (
-        <div style={{
-          textAlign: 'center', padding: '48px 0',
-          color: c.textMuted, fontSize: 14,
-        }}>
-          Aucun projet. Créez-en un ci-dessus.
+        <div className="text-center py-16 text-atlas-text-muted dark:text-atlas-dark-text-muted text-sm">
+          Aucun projet — créez votre premier projet ci-dessus.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {projects.map(p => (
-            <div key={p.id} style={{
-              background: p.id === currentProjectId ? c.elevated : c.surface,
-              border: `1px solid ${p.id === currentProjectId ? c.blue : c.border}`,
-              borderRadius: 10, padding: '14px 18px',
-              display: 'flex', alignItems: 'center', gap: 14,
-            }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, color: c.text, fontSize: 14 }}>{p.name}</div>
-                {p.description && (
-                  <div style={{ fontSize: 12, color: c.textMuted, marginTop: 2 }}>{p.description}</div>
+        <div className="flex flex-col gap-2.5">
+          {projects.map(p => {
+            const isOpen = p.id === currentProjectId
+            return (
+              <div
+                key={p.id}
+                className={[
+                  'flex items-center gap-3.5 px-4 py-3.5 rounded-xl border transition-colors',
+                  isOpen
+                    ? 'bg-atlas-gold/5 border-atlas-gold/40 dark:border-atlas-gold/30'
+                    : 'bg-atlas-card dark:bg-atlas-dark-card border-atlas-card-border dark:border-atlas-dark-card-border',
+                ].join(' ')}
+              >
+                {/* Colored left accent for open project */}
+                {isOpen && (
+                  <div className="w-1 h-8 rounded-full bg-atlas-gold flex-shrink-0 -ml-1" />
                 )}
-                <div style={{ fontSize: 11, color: c.textMuted, marginTop: 4 }}>
-                  Modifié le {formatDate(p.updated_at)}
-                </div>
-              </div>
 
-              {/* Confirm delete inline */}
-              {confirmDelete === p.id ? (
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: c.red }}>Supprimer ?</span>
-                  <button type="button" onClick={() => handleDelete(p.id)} style={{
-                    background: c.red, border: 'none', borderRadius: 6,
-                    padding: '5px 10px', color: '#fff', fontSize: 12, cursor: 'pointer',
-                  }}>Oui</button>
-                  <button type="button" onClick={() => setConfirmDelete(null)} style={{
-                    background: c.elevated, border: `1px solid ${c.border}`,
-                    borderRadius: 6, padding: '5px 10px', color: c.textSec,
-                    fontSize: 12, cursor: 'pointer',
-                  }}>Non</button>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm text-atlas-text dark:text-atlas-dark-text truncate">
+                    {p.name}
+                  </div>
+                  {p.description && (
+                    <div className="text-xs text-atlas-text-muted dark:text-atlas-dark-text-muted mt-0.5 truncate">
+                      {p.description}
+                    </div>
+                  )}
+                  <div className="text-[11px] text-atlas-text-muted dark:text-atlas-dark-text-muted mt-1">
+                    Modifié le {formatDate(p.updated_at)}
+                  </div>
                 </div>
-              ) : (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="button" onClick={() => handleOpen(p.id)} style={{
-                    background: c.blue, border: 'none', borderRadius: 7,
-                    padding: '7px 14px', color: '#fff', fontSize: 13,
-                    fontWeight: 600, cursor: 'pointer',
-                  }}>
-                    Ouvrir
-                  </button>
-                  <button type="button" onClick={() => setConfirmDelete(p.id)} style={{
-                    background: 'none', border: `1px solid ${c.border}`,
-                    borderRadius: 7, padding: '7px 10px', color: c.textMuted,
-                    fontSize: 13, cursor: 'pointer',
-                  }}>
-                    ✕
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
+
+                {/* Actions */}
+                {confirmDelete === p.id ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-atlas-danger">Supprimer ?</span>
+                    <button type="button" onClick={() => handleDelete(p.id)}
+                      className="px-2.5 py-1 rounded-md text-xs font-semibold bg-atlas-danger text-white hover:bg-atlas-danger/90 transition-colors">
+                      Oui
+                    </button>
+                    <button type="button" onClick={() => setConfirmDelete(null)}
+                      className="px-2.5 py-1 rounded-md text-xs border border-atlas-border dark:border-atlas-dark-border
+                        text-atlas-text-sec dark:text-atlas-dark-text-sec hover:bg-atlas-border/30 transition-colors">
+                      Non
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => handleOpen(p.id)}
+                      className="px-3.5 py-1.5 rounded-lg text-xs font-semibold
+                        bg-atlas-topbar dark:bg-atlas-dark-card text-atlas-gold border border-atlas-gold/40
+                        hover:bg-atlas-topbar/80 transition-colors">
+                      Ouvrir
+                    </button>
+                    <button type="button" onClick={() => setConfirmDelete(p.id)}
+                      className="px-2.5 py-1.5 rounded-lg text-xs
+                        border border-atlas-border dark:border-atlas-dark-border
+                        text-atlas-text-muted dark:text-atlas-dark-text-muted
+                        hover:border-atlas-danger/50 hover:text-atlas-danger transition-colors">
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
-      {/* Save indicator for open project */}
+      {/* ── Save open project ────────────────────────────────────────── */}
       {currentProjectId && (
-        <div style={{ marginTop: 28, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="mt-7">
           <button
             type="button"
             onClick={() => useProjectStore.getState().saveCurrentProject()}
             disabled={isSaving}
-            style={{
-              padding: '8px 18px',
-              background: isSaving ? c.borderLight : c.green,
-              border: 'none', borderRadius: 8,
-              color: '#fff', fontSize: 13, fontWeight: 600,
-              cursor: isSaving ? 'default' : 'pointer',
-            }}
+            className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors
+              bg-atlas-success text-white hover:bg-atlas-success/90
+              disabled:opacity-50 disabled:cursor-default"
           >
             {isSaving ? 'Sauvegarde…' : 'Sauvegarder le projet ouvert'}
           </button>

@@ -1,17 +1,11 @@
 /**
- * StructCalc — Paramètres Généraux (Phase 3)
- * Reads from Zustand stores — no more props drilling.
- *
- * Block 1 — Identification          (facultatif, auto-generated)
- * Block 2 — Paramètres sismiques    (wilaya -> zone, site, groupe, QF, R)
- * Block 3 — Géométrie et masses     (table des niveaux)
- * Block 4 — Résultats analyse dyn.  (Tx, Ty, Vxd, Vyd, déplacements)
+ * Bunyan — Paramètres Généraux (Phase 6: Atlas theme)
+ * All data from Zustand stores. No color prop — all Tailwind.
  */
 
 import { useState, useEffect } from "react"
 import QFModal, { DEF_CHECKED } from "../shared/QFModal"
 import RModal, { type BracingSystem } from "../shared/RModal"
-import type { AppColors } from "../../types"
 import { useProjectStore, useSeismicStore, useStructuralStore } from "../../stores"
 
 const ZONE_LABELS: Record<string, string> = {
@@ -20,113 +14,70 @@ const ZONE_LABELS: Record<string, string> = {
   "IV":"Zone IV (0.20g)","V":"Zone V (0.25g)","VI":"Zone VI (0.30g)",
 }
 
-interface FrameSystem {
-  v: string;
-  l: string;
-  ct: string;
-}
-
-const FRAME_SYSTEMS: FrameSystem[] = [
-  {v:"ba_no_infill",   l:"Ossature BA sans remplissage",       ct:"CT=0.075"},
-  {v:"steel_no_infill",l:"Ossature acier sans remplissage",    ct:"CT=0.085"},
-  {v:"ba_with_infill", l:"Ossature BA/acier avec remplissage", ct:"CT=0.050"},
-  {v:"other",          l:"Autres systèmes",                    ct:"CT=0.050"},
+const FRAME_SYSTEMS = [
+  {v:"ba_no_infill",    l:"Ossature BA sans remplissage",        ct:"CT=0.075"},
+  {v:"steel_no_infill", l:"Ossature acier sans remplissage",     ct:"CT=0.085"},
+  {v:"ba_with_infill",  l:"Ossature BA/acier avec remplissage",  ct:"CT=0.050"},
+  {v:"other",           l:"Autres systèmes",                     ct:"CT=0.050"},
 ]
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SMALL REUSABLE COMPONENTS
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Shared sub-components ─────────────────────────────────────────────────────
 
-function BlockHeader({ title, color, c }: { title: string; color: string; c: AppColors }) {
+function CardHeader({ title, accent = 'gold' }: { title: string; accent?: 'gold' | 'green' | 'blue' | 'amber' | 'muted' }) {
+  const cls = {
+    gold:  'text-atlas-gold',
+    green: 'text-atlas-success',
+    blue:  'text-atlas-info',
+    amber: 'text-atlas-warning',
+    muted: 'text-atlas-text-muted dark:text-atlas-dark-text-muted',
+  }[accent]
   return (
-    <div style={{fontSize:11,letterSpacing:"0.08em",fontWeight:700,
-      color:color,textTransform:"uppercase",marginBottom:12}}>
+    <div className={`text-[11px] uppercase tracking-[0.08em] font-bold mb-3 ${cls}`}>
       {title}
     </div>
   )
 }
 
-function Field({ label, children, c }: { label: string; children: React.ReactNode; c: AppColors }) {
+function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:10}}>
-      <label style={{fontSize:11,letterSpacing:"0.06em",color:c.textSec,
-        textTransform:"uppercase",fontWeight:600}}>{label}</label>
+    <label className="block text-[11px] uppercase tracking-[0.06em] font-semibold
+      text-atlas-text-sec dark:text-atlas-dark-text-sec mb-1">
       {children}
-    </div>
+    </label>
   )
 }
 
-interface TextInputProps {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  c: AppColors;
-  style?: React.CSSProperties;
-}
-function TextInput({ value, onChange, placeholder, c, style = {} }: TextInputProps) {
-  return (
-    <input type="text" value={value} placeholder={placeholder}
-      onChange={e => onChange(e.target.value)}
-      style={{background:c.elevated,border:`1px solid ${c.border}`,
-        color:c.text,borderRadius:8,padding:"8px 10px",
-        fontSize:13,outline:"none",...style}}/>
-  )
-}
-
-interface DirButtonProps {
-  label: string;
-  active: boolean;
-  color: string;
-  onClick: () => void;
-  c: AppColors;
-}
-function DirButton({ label, active, color, onClick, c }: DirButtonProps) {
-  return (
-    <button type="button" onClick={onClick} style={{
-      flex:1,padding:"6px",borderRadius:8,cursor:"pointer",
-      border:`1px solid ${active ? color : c.border}`,
-      background:active ? color+"22" : c.elevated,
-      color:active ? color : c.textSec,
-      fontSize:12,fontWeight:active ? 700 : 400}}>
-      {label}
-    </button>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PROPS — only c (AppColors) needed now; all data comes from stores
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface ProjectParamsProps {
-  c: AppColors;
-}
+const inputCls = `w-full px-2.5 py-2 rounded-md text-[13px] outline-none transition-colors
+  bg-atlas-bg dark:bg-atlas-dark-bg
+  border border-atlas-border dark:border-atlas-dark-border
+  text-atlas-text dark:text-atlas-dark-text
+  focus:border-atlas-gold focus:ring-1 focus:ring-atlas-gold/20`
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function ProjectParams({ c }: ProjectParamsProps) {
-  // Stores
+export default function ProjectParams() {
   const project    = useProjectStore()
   const seismic    = useSeismicStore()
   const structural = useStructuralStore()
 
-  // Modal visibility — null | "single" | "x" | "y"
   const [showQF, setShowQF] = useState<string | null>(null)
   const [showR,  setShowR]  = useState<string | null>(null)
 
-  // Fetch wilayas on mount if not already loaded
   useEffect(() => {
-    if (project.wilayas.length === 0) {
-      project.fetchWilayas()
-    }
+    if (project.wilayas.length === 0) project.fetchWilayas()
   }, [])
 
-  // Current wilaya info from store
-  const wilaya = project.wilayas.find(w => w.code === project.wilayaCode)
+  const wilaya    = project.wilayas.find(w => w.code === project.wilayaCode)
   const hasCommunes = project.communes.length > 0
+  const isZone0   = project.zone === "0"
 
-  // QF modal helpers
+  const totalW = structural.stories.reduce((a, s) => a + (parseFloat(s.weight) || 0), 0)
+  const hn     = structural.stories.length
+    ? Math.max(...structural.stories.map(s => parseFloat(s.elevation) || 0))
+    : 0
+
   function handleQFValidate(qf: number, cat: string, chk: Record<string, boolean>) {
     if (showQF === "x")      seismic.setQFParams({ QFx: qf, qfCatX: cat, qfChkX: chk })
     else if (showQF === "y") seismic.setQFParams({ QFy: qf, qfCatY: cat, qfChkY: chk })
@@ -134,7 +85,6 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
     setShowQF(null)
   }
 
-  // R modal helpers
   function handleRValidate(r: number | undefined, sys: BracingSystem | null | undefined) {
     if (showR === "x") {
       seismic.setRParams({ Rx: r ?? seismic.Rx, selSysX: sys?.id ?? 1 })
@@ -149,107 +99,94 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
     setShowR(null)
   }
 
-  const isZone0 = project.zone === "0"
-  const totalW  = structural.stories.reduce((a, s) => a + (parseFloat(s.weight) || 0), 0)
-  const hn      = structural.stories.length
-    ? Math.max(...structural.stories.map(s => parseFloat(s.elevation) || 0))
-    : 0
-
-  const inputStyle: React.CSSProperties = {background:c.elevated,border:`1px solid ${c.border}`,
-    color:c.text,borderRadius:8,padding:"8px 10px",fontSize:13,outline:"none",width:"100%"}
-
   return (
-    <div style={{background:c.bg,minHeight:"100vh",color:c.text,
-      fontFamily:"'IBM Plex Sans','Segoe UI',sans-serif",
-      padding:"22px 20px",transition:"background 0.2s"}}>
+    <div className="p-5 min-h-full bg-atlas-bg dark:bg-atlas-dark-bg text-atlas-text dark:text-atlas-dark-text">
 
-      {/* QF Modals */}
+      {/* Modals */}
       {showQF && (
-        <QFModal c={c}
+        <QFModal
           initCat={showQF==="x" ? seismic.qfCatX : showQF==="y" ? seismic.qfCatY : seismic.qfCat}
           initChecked={showQF==="x" ? seismic.qfChkX : showQF==="y" ? seismic.qfChkY : seismic.qfChk}
           onClose={() => setShowQF(null)}
           onValidate={handleQFValidate}/>
       )}
-
-      {/* R Modals */}
       {showR && (
-        <RModal c={c}
+        <RModal
           initSystem={showR==="x" ? seismic.selSysX : showR==="y" ? seismic.selSysY : seismic.selSys}
           onClose={() => setShowR(null)}
           onValidate={handleRValidate}/>
       )}
 
-      {/* Header */}
-      <div style={{marginBottom:24}}>
-        <div style={{fontSize:12,letterSpacing:"0.12em",color:c.blue,
-          textTransform:"uppercase",marginBottom:5,fontWeight:600}}>
-          StructCalc — Paramètres
+      {/* ── Page header ─────────────────────────────────────────────── */}
+      <div className="mb-6">
+        <div className="text-[11px] uppercase tracking-[0.12em] text-atlas-gold font-semibold mb-1">
+          Bunyan — Paramètres
         </div>
-        <h1 style={{fontSize:22,fontWeight:700,margin:0,color:c.text}}>
+        <h1 className="text-xl font-bold text-atlas-text dark:text-atlas-dark-text">
           Paramètres Généraux
         </h1>
-        <div style={{color:c.textSec,fontSize:13,marginTop:3}}>
+        <p className="text-xs text-atlas-text-sec dark:text-atlas-dark-text-sec mt-1">
           Définis une fois — utilisés par tous les modules de vérification
-        </div>
+        </p>
       </div>
 
-      <div style={{display:"flex",gap:18,flexWrap:"wrap",alignItems:"flex-start"}}>
+      <div className="flex gap-4 flex-wrap items-start">
 
-        {/* ── COLUMN 1: Identification + Sismique ── */}
-        <div style={{display:"flex",flexDirection:"column",gap:14,width:240,flexShrink:0}}>
+        {/* ── COL 1: Identification + Sismique ────────────────────── */}
+        <div className="flex flex-col gap-3.5 w-60 shrink-0">
 
-          {/* BLOCK 1 — Identification */}
-          <div style={{background:c.surface,border:`1px solid ${c.border}`,borderRadius:14,padding:16}}>
-            <BlockHeader title="1 — Identification" color={c.textMuted} c={c}/>
-            <div style={{fontSize:11,color:c.textMuted,marginBottom:10,fontStyle:"italic"}}>
+          {/* Card: Identification */}
+          <div className="bg-atlas-card dark:bg-atlas-dark-card border border-atlas-card-border dark:border-atlas-dark-card-border rounded-xl p-4">
+            <CardHeader title="1 — Identification" accent="muted" />
+            <p className="text-[11px] text-atlas-text-muted dark:text-atlas-dark-text-muted mb-3 italic">
               Facultatif — généré automatiquement si vide
-            </div>
+            </p>
 
-            <Field label="Nom du projet" c={c}>
-              <TextInput value={project.projectName}
-                onChange={v => project.setProjectMeta({ projectName: v })}
-                placeholder={`Projet_${project.date}`} c={c}/>
-            </Field>
-            <Field label="Ingénieur" c={c}>
-              <TextInput value={project.engineer}
-                onChange={v => project.setProjectMeta({ engineer: v })}
-                placeholder="Nom de l'ingénieur" c={c}/>
-            </Field>
-            <Field label="Référence" c={c}>
-              <TextInput value={project.reference}
-                onChange={v => project.setProjectMeta({ reference: v })}
-                placeholder="Réf. dossier" c={c}/>
-            </Field>
-            <Field label="Date" c={c}>
-              <div style={{background:c.elevated,border:`1px solid ${c.border}`,
-                borderRadius:8,padding:"8px 10px",fontSize:13,color:c.textMuted}}>
+            {(['projectName', 'engineer', 'reference'] as const).map((key, i) => (
+              <div key={key} className="mb-2.5">
+                <FieldLabel>
+                  {['Nom du projet', 'Ingénieur', 'Référence'][i]}
+                </FieldLabel>
+                <input type="text"
+                  value={project[key]}
+                  onChange={e => project.setProjectMeta({ [key]: e.target.value })}
+                  placeholder={key === 'projectName' ? `Projet_${project.date}` : key === 'engineer' ? "Nom de l'ingénieur" : 'Réf. dossier'}
+                  className={inputCls}
+                />
+              </div>
+            ))}
+
+            <div className="mb-0">
+              <FieldLabel>Date</FieldLabel>
+              <div className="px-2.5 py-2 rounded-md text-[13px] bg-atlas-bg dark:bg-atlas-dark-bg border border-atlas-border dark:border-atlas-dark-border text-atlas-text-muted dark:text-atlas-dark-text-muted">
                 {project.date}
               </div>
-            </Field>
+            </div>
           </div>
 
-          {/* BLOCK 2 — Paramètres sismiques */}
-          <div style={{background:c.surface,border:`1px solid ${c.border}`,borderRadius:14,padding:16}}>
-            <BlockHeader title="2 — Paramètres sismiques" color={c.blue} c={c}/>
+          {/* Card: Paramètres sismiques */}
+          <div className="bg-atlas-card dark:bg-atlas-dark-card border border-atlas-card-border dark:border-atlas-dark-card-border rounded-xl p-4 border-l-[3px] border-l-atlas-info">
+            <CardHeader title="2 — Paramètres sismiques" accent="blue" />
 
             {/* Wilaya */}
-            <Field label="Wilaya" c={c}>
+            <div className="mb-2.5">
+              <FieldLabel>Wilaya</FieldLabel>
               <select value={project.wilayaCode} onChange={e => project.setWilaya(e.target.value)}
-                disabled={project.wilayasLoading}
-                style={inputStyle}>
+                disabled={project.wilayasLoading} title="Wilaya"
+                className={inputCls}>
                 {project.wilayas.map(w => (
                   <option key={w.code} value={w.code}>{w.code} — {w.name}</option>
                 ))}
               </select>
-            </Field>
+            </div>
 
-            {/* Commune — only if split wilaya with communes */}
+            {/* Commune */}
             {wilaya?.has_split_zones && hasCommunes && (
-              <Field label="Commune" c={c}>
+              <div className="mb-2.5">
+                <FieldLabel>Commune</FieldLabel>
                 <select value={project.commune} onChange={e => project.setCommune(e.target.value)}
-                  disabled={project.communesLoading}
-                  style={{...inputStyle,border:`1px solid ${c.amber}66`}}>
+                  disabled={project.communesLoading} title="Commune"
+                  className={`${inputCls} border-atlas-warning/50`}>
                   <option value="">— Autre commune (Zone {wilaya.zone})</option>
                   {[...project.communes]
                     .sort((a,b) => a.zone.localeCompare(b.zone)||a.name.localeCompare(b.name))
@@ -257,307 +194,268 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
                       <option key={cm.name} value={cm.name}>{cm.name} → Zone {cm.zone}</option>
                     ))}
                 </select>
-              </Field>
+              </div>
             )}
             {wilaya?.has_split_zones && !hasCommunes && !project.communesLoading && (
-              <div style={{background:c.amber+"11",border:`1px solid ${c.amber}44`,
-                borderRadius:8,padding:"8px 10px",fontSize:11,color:c.amber,
-                lineHeight:1.5,marginBottom:10}}>
+              <div className="mb-2.5 px-3 py-2 rounded-md text-[11px] leading-relaxed text-atlas-warning bg-atlas-warning/10 border border-atlas-warning/30">
                 ⚠️ Wilaya partagée — consulter l'Annexe A du RPA 2024
               </div>
             )}
 
-            {/* Zone display */}
-            <div style={{background:isZone0 ? c.amber+"18" : c.blue+"18",
-              border:`1px solid ${isZone0 ? c.amber : c.blue}55`,
-              borderRadius:8,padding:"8px 11px",marginBottom:10}}>
-              <div style={{fontSize:10,color:c.textMuted,marginBottom:2,
-                textTransform:"uppercase",letterSpacing:"0.06em"}}>Zone sismique</div>
-              <div style={{fontSize:14,fontWeight:700,color:isZone0 ? c.amber : c.blue}}>
+            {/* Zone badge */}
+            <div className={`mb-2.5 px-3 py-2 rounded-md border ${
+              isZone0
+                ? 'bg-atlas-warning/10 border-atlas-warning/30'
+                : 'bg-atlas-info/10 border-atlas-info/30'
+            }`}>
+              <div className="text-[10px] uppercase tracking-[0.06em] text-atlas-text-muted dark:text-atlas-dark-text-muted mb-0.5">
+                Zone sismique
+              </div>
+              <div className={`text-sm font-bold ${isZone0 ? 'text-atlas-warning' : 'text-atlas-info'}`}>
                 {ZONE_LABELS[project.zone] || project.zone}
               </div>
             </div>
 
             {/* Site class */}
-            <Field label="Classe de site" c={c}>
-              <div style={{display:"flex",gap:5}}>
+            <div className="mb-2.5">
+              <FieldLabel>Classe de site</FieldLabel>
+              <div className="flex gap-1">
                 {["S1","S2","S3","S4"].map(s => (
-                  <button type="button" key={s} onClick={() => project.setSite(s)} style={{
-                    flex:1,padding:"6px 0",borderRadius:7,cursor:"pointer",
-                    border:`1px solid ${project.site===s ? c.green : c.border}`,
-                    background:project.site===s ? c.green+"22" : c.elevated,
-                    color:project.site===s ? c.green : c.textSec,
-                    fontSize:12,fontWeight:project.site===s ? 700 : 400}}>
+                  <button type="button" key={s} onClick={() => project.setSite(s)}
+                    className={`flex-1 py-1.5 rounded-md text-xs font-medium transition-colors border ${
+                      project.site === s
+                        ? 'border-atlas-gold bg-atlas-gold/15 text-atlas-gold font-bold'
+                        : 'border-atlas-border dark:border-atlas-dark-border bg-atlas-bg dark:bg-atlas-dark-bg text-atlas-text-sec dark:text-atlas-dark-text-sec hover:border-atlas-gold/40'
+                    }`}>
                     {s}
                   </button>
                 ))}
               </div>
-            </Field>
+            </div>
 
             {/* Importance group */}
-            <Field label="Groupe d'importance" c={c}>
-              <select value={project.group} onChange={e => project.setGroup(e.target.value)}
-                style={inputStyle}>
+            <div className="mb-2.5">
+              <FieldLabel>Groupe d'importance</FieldLabel>
+              <select value={project.group} onChange={e => project.setGroup(e.target.value)} title="Groupe d'importance" className={inputCls}>
                 <option value="1A">Groupe 1A — I=1.4</option>
                 <option value="1B">Groupe 1B — I=1.2</option>
                 <option value="2">Groupe 2 — I=1.0</option>
                 <option value="3">Groupe 3 — I=0.8</option>
               </select>
-            </Field>
+            </div>
 
             {/* Direction toggle */}
-            <Field label="Directions d'analyse (spectre)" c={c}>
-              <div style={{display:"flex",gap:6}}>
-                <DirButton label="Direction unique" active={!seismic.twoDir}
-                  color={c.blue} onClick={() => seismic.setTwoDir(false)} c={c}/>
-                <DirButton label="X et Y séparées" active={seismic.twoDir}
-                  color={c.purple} onClick={() => seismic.setTwoDir(true)} c={c}/>
+            <div className="mb-2.5">
+              <FieldLabel>Directions d'analyse</FieldLabel>
+              <div className="flex gap-1.5">
+                {[
+                  { label: 'Direction unique', val: false },
+                  { label: 'X et Y séparées', val: true },
+                ].map(opt => (
+                  <button type="button" key={String(opt.val)} onClick={() => seismic.setTwoDir(opt.val)}
+                    className={`flex-1 py-1.5 px-2 rounded-md text-[11px] border transition-colors ${
+                      seismic.twoDir === opt.val
+                        ? 'border-atlas-gold bg-atlas-gold/15 text-atlas-gold font-semibold'
+                        : 'border-atlas-border dark:border-atlas-dark-border text-atlas-text-sec dark:text-atlas-dark-text-sec hover:border-atlas-gold/40 bg-atlas-bg dark:bg-atlas-dark-bg'
+                    }`}>
+                    {opt.label}
+                  </button>
+                ))}
               </div>
-            </Field>
+            </div>
 
-            {/* QF and R — single or double */}
+            {/* QF and R */}
             {!seismic.twoDir ? (
               <>
-                <Field label="Facteur qualité QF" c={c}>
-                  <button type="button" onClick={() => setShowQF("single")} style={{
-                    width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
-                    padding:"9px 11px",borderRadius:8,cursor:"pointer",
-                    background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:13}}>
-                    <span>Q<sub>F</sub> = <b style={{color:c.amber}}>{seismic.QF.toFixed(2)}</b></span>
-                    <span style={{fontSize:12,color:c.blue}}>Calculer →</span>
+                <div className="mb-2.5">
+                  <FieldLabel>Facteur qualité QF</FieldLabel>
+                  <button type="button" onClick={() => setShowQF("single")}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-md text-[13px] border cursor-pointer transition-colors bg-atlas-bg dark:bg-atlas-dark-bg border-atlas-border dark:border-atlas-dark-border hover:border-atlas-gold/50">
+                    <span>Q<sub>F</sub> = <b className="text-atlas-warning">{seismic.QF.toFixed(2)}</b></span>
+                    <span className="text-[11px] text-atlas-info">Calculer →</span>
                   </button>
-                </Field>
-                <Field label="Coeff. comportement R" c={c}>
-                  <button type="button" onClick={() => setShowR("single")} style={{
-                    width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
-                    padding:"9px 11px",borderRadius:8,cursor:"pointer",
-                    background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:13}}>
-                    <span>R = <b style={{color:c.red}}>{seismic.R}</b></span>
-                    <span style={{fontSize:12,color:c.blue}}>Identifier →</span>
+                </div>
+                <div className="mb-2.5">
+                  <FieldLabel>Coeff. comportement R</FieldLabel>
+                  <button type="button" onClick={() => setShowR("single")}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-md text-[13px] border cursor-pointer transition-colors bg-atlas-bg dark:bg-atlas-dark-bg border-atlas-border dark:border-atlas-dark-border hover:border-atlas-gold/50">
+                    <span>R = <b className="text-atlas-danger">{seismic.R}</b></span>
+                    <span className="text-[11px] text-atlas-info">Identifier →</span>
                   </button>
-                  <div style={{fontSize:11,color:c.textSec,marginTop:4,paddingLeft:2}}>
+                  <p className="text-[11px] text-atlas-text-sec dark:text-atlas-dark-text-sec mt-1 pl-0.5">
                     Syst. {seismic.selSys} · Cat. Q<sub>F</sub> ({seismic.qfCat})
-                  </div>
-                </Field>
+                  </p>
+                </div>
               </>
             ) : (
               <>
                 {/* Direction X */}
-                <div style={{background:c.blue+"11",border:`1px solid ${c.blue}33`,
-                  borderRadius:8,padding:"10px",marginBottom:8}}>
-                  <div style={{fontSize:11,color:c.blue,fontWeight:700,marginBottom:8,
-                    textTransform:"uppercase",letterSpacing:"0.06em"}}>Direction X</div>
-                  <button type="button" onClick={() => setShowQF("x")} style={{
-                    width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
-                    padding:"8px 10px",borderRadius:7,cursor:"pointer",
-                    background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12,marginBottom:6}}>
-                    <span>Q<sub>Fx</sub> = <b style={{color:c.amber}}>{seismic.QFx.toFixed(2)}</b></span>
-                    <span style={{fontSize:11,color:c.blue}}>Calculer →</span>
+                <div className="mb-2 p-2.5 rounded-md bg-atlas-info/8 border border-atlas-info/25">
+                  <div className="text-[11px] text-atlas-info font-bold uppercase tracking-[0.06em] mb-2">Direction X</div>
+                  <button type="button" onClick={() => setShowQF("x")}
+                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded mb-1.5 text-[12px] border cursor-pointer bg-atlas-bg dark:bg-atlas-dark-bg border-atlas-border dark:border-atlas-dark-border hover:border-atlas-gold/50">
+                    <span>Q<sub>Fx</sub> = <b className="text-atlas-warning">{seismic.QFx.toFixed(2)}</b></span>
+                    <span className="text-[11px] text-atlas-info">Calculer →</span>
                   </button>
-                  <button type="button" onClick={() => setShowR("x")} style={{
-                    width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
-                    padding:"8px 10px",borderRadius:7,cursor:"pointer",
-                    background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12}}>
-                    <span>Rx = <b style={{color:c.red}}>{seismic.Rx}</b></span>
-                    <span style={{fontSize:11,color:c.blue}}>Identifier →</span>
+                  <button type="button" onClick={() => setShowR("x")}
+                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-[12px] border cursor-pointer bg-atlas-bg dark:bg-atlas-dark-bg border-atlas-border dark:border-atlas-dark-border hover:border-atlas-gold/50">
+                    <span>Rx = <b className="text-atlas-danger">{seismic.Rx}</b></span>
+                    <span className="text-[11px] text-atlas-info">Identifier →</span>
                   </button>
                 </div>
                 {/* Direction Y */}
-                <div style={{background:c.purple+"11",border:`1px solid ${c.purple}33`,
-                  borderRadius:8,padding:"10px"}}>
-                  <div style={{fontSize:11,color:c.purple,fontWeight:700,marginBottom:8,
-                    textTransform:"uppercase",letterSpacing:"0.06em"}}>Direction Y</div>
-                  <button type="button" onClick={() => setShowQF("y")} style={{
-                    width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
-                    padding:"8px 10px",borderRadius:7,cursor:"pointer",
-                    background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12,marginBottom:6}}>
-                    <span>Q<sub>Fy</sub> = <b style={{color:c.amber}}>{seismic.QFy.toFixed(2)}</b></span>
-                    <span style={{fontSize:11,color:c.blue}}>Calculer →</span>
+                <div className="mb-2.5 p-2.5 rounded-md bg-atlas-info/5 border border-atlas-info/15">
+                  <div className="text-[11px] text-atlas-text-sec dark:text-atlas-dark-text-sec font-bold uppercase tracking-[0.06em] mb-2">Direction Y</div>
+                  <button type="button" onClick={() => setShowQF("y")}
+                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded mb-1.5 text-[12px] border cursor-pointer bg-atlas-bg dark:bg-atlas-dark-bg border-atlas-border dark:border-atlas-dark-border hover:border-atlas-gold/50">
+                    <span>Q<sub>Fy</sub> = <b className="text-atlas-warning">{seismic.QFy.toFixed(2)}</b></span>
+                    <span className="text-[11px] text-atlas-info">Calculer →</span>
                   </button>
-                  <button type="button" onClick={() => setShowR("y")} style={{
-                    width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
-                    padding:"8px 10px",borderRadius:7,cursor:"pointer",
-                    background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12}}>
-                    <span>Ry = <b style={{color:c.red}}>{seismic.Ry}</b></span>
-                    <span style={{fontSize:11,color:c.blue}}>Identifier →</span>
+                  <button type="button" onClick={() => setShowR("y")}
+                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-[12px] border cursor-pointer bg-atlas-bg dark:bg-atlas-dark-bg border-atlas-border dark:border-atlas-dark-border hover:border-atlas-gold/50">
+                    <span>Ry = <b className="text-atlas-danger">{seismic.Ry}</b></span>
+                    <span className="text-[11px] text-atlas-info">Identifier →</span>
                   </button>
                 </div>
               </>
             )}
 
-            {/* Structural system for period */}
-            <Field label="Système pour période T (CT)" c={c}>
-              <select value={seismic.frameSys} onChange={e => seismic.setField('frameSys', e.target.value)}
-                style={inputStyle}>
+            {/* Frame system */}
+            <div>
+              <FieldLabel>Système pour période T (CT)</FieldLabel>
+              <select value={seismic.frameSys} onChange={e => seismic.setField('frameSys', e.target.value)} title="Système structurel" className={inputCls}>
                 {FRAME_SYSTEMS.map(f => (
                   <option key={f.v} value={f.v}>{f.ct} — {f.l.split(" ").slice(0,4).join(" ")}</option>
                 ))}
               </select>
-            </Field>
+            </div>
           </div>
         </div>
 
-        {/* ── COLUMN 2: Géométrie ── */}
-        <div style={{display:"flex",flexDirection:"column",gap:14,width:300,flexShrink:0}}>
-          <div style={{background:c.surface,border:`1px solid ${c.border}`,borderRadius:14,padding:16}}>
-            <BlockHeader title="3 — Géométrie et masses" color={c.green} c={c}/>
+        {/* ── COL 2: Géométrie et masses ───────────────────────────── */}
+        <div className="w-[300px] shrink-0">
+          <div className="bg-atlas-card dark:bg-atlas-dark-card border border-atlas-card-border dark:border-atlas-dark-card-border rounded-xl p-4 border-l-[3px] border-l-atlas-success">
+            <CardHeader title="3 — Géométrie et masses" accent="green" />
 
             {/* Column headers */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 65px 75px 28px",
-              gap:6,marginBottom:6}}>
-              {["Niveau","h (m)","W (kN)",""].map((h,i) => (
-                <div key={i} style={{fontSize:10,color:c.textMuted,
-                  textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>{h}</div>
-              ))}
+            <div className="grid gap-1.5 mb-1.5 text-[10px] uppercase tracking-[0.06em] font-semibold text-atlas-text-muted dark:text-atlas-dark-text-muted [grid-template-columns:1fr_65px_75px_28px]">
+              {["Niveau","h (m)","W (kN)",""].map((h,i) => <div key={i}>{h}</div>)}
             </div>
 
-            {/* Storey rows */}
-            <div style={{display:"flex",flexDirection:"column",gap:5,
-              maxHeight:340,overflowY:"auto",marginBottom:10}}>
+            {/* Story rows */}
+            <div className="flex flex-col gap-1.5 mb-2.5 max-h-80 overflow-y-auto">
               {structural.stories.map(s => (
-                <div key={s.id} style={{display:"grid",
-                  gridTemplateColumns:"1fr 65px 75px 28px",gap:6,alignItems:"center"}}>
-                  <input value={s.name}
+                <div key={s.id} className="grid gap-1.5 items-center [grid-template-columns:1fr_65px_75px_28px]">
+                  <input value={s.name} title="Nom du niveau"
                     onChange={e => structural.updateStory(s.id, "name", e.target.value)}
-                    style={{background:c.elevated,border:`1px solid ${c.border}`,
-                      borderRadius:6,padding:"6px 7px",color:c.text,fontSize:12,
-                      outline:"none",width:"100%"}}/>
-                  <input type="number" value={s.elevation} min={0} step={0.5}
+                    className="px-2 py-1.5 rounded text-[12px] outline-none bg-atlas-bg dark:bg-atlas-dark-bg border border-atlas-border dark:border-atlas-dark-border text-atlas-text dark:text-atlas-dark-text focus:border-atlas-gold w-full"/>
+                  <input type="number" value={s.elevation} min={0} step={0.5} title="Hauteur (m)"
                     onChange={e => structural.updateStory(s.id, "elevation", e.target.value)}
-                    style={{background:c.elevated,border:`1px solid ${c.border}`,
-                      borderRadius:6,padding:"6px 7px",color:c.purple,
-                      fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
-                  <input type="number" value={s.weight} min={0}
+                    className="px-2 py-1.5 rounded text-[12px] font-mono outline-none bg-atlas-bg dark:bg-atlas-dark-bg border border-atlas-border dark:border-atlas-dark-border text-atlas-info focus:border-atlas-gold w-full"/>
+                  <input type="number" value={s.weight} min={0} title="Poids (kN)"
                     onChange={e => structural.updateStory(s.id, "weight", e.target.value)}
-                    style={{background:c.elevated,border:`1px solid ${c.border}`,
-                      borderRadius:6,padding:"6px 7px",color:c.green,
-                      fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
+                    className="px-2 py-1.5 rounded text-[12px] font-mono outline-none bg-atlas-bg dark:bg-atlas-dark-bg border border-atlas-border dark:border-atlas-dark-border text-atlas-success focus:border-atlas-gold w-full"/>
                   <button type="button" onClick={() => structural.removeStory(s.id)}
-                    disabled={structural.stories.length<=1}
-                    style={{width:24,height:24,borderRadius:5,cursor:"pointer",
-                      background:structural.stories.length>1 ? c.red+"22" : "transparent",
-                      border:structural.stories.length>1 ? `1px solid ${c.red}44` : "1px solid transparent",
-                      color:structural.stories.length>1 ? c.red : c.textMuted,
-                      fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    disabled={structural.stories.length <= 1}
+                    className={`w-6 h-6 rounded flex items-center justify-center text-[13px] transition-colors border ${
+                      structural.stories.length > 1
+                        ? 'bg-atlas-danger/10 border-atlas-danger/30 text-atlas-danger hover:bg-atlas-danger/20 cursor-pointer'
+                        : 'border-transparent text-atlas-text-muted dark:text-atlas-dark-text-muted cursor-default'
+                    }`}>
                     ×
                   </button>
                 </div>
               ))}
             </div>
 
-            <button type="button" onClick={() => structural.addStory()} style={{
-              width:"100%",padding:"7px",borderRadius:7,cursor:"pointer",
-              background:c.green+"22",border:`1px solid ${c.green}44`,
-              color:c.green,fontSize:12,fontWeight:600,marginBottom:10}}>
+            <button type="button" onClick={() => structural.addStory()}
+              className="w-full py-1.5 rounded-md text-[12px] font-semibold mb-2.5 transition-colors
+                bg-atlas-success/10 border border-atlas-success/30 text-atlas-success
+                hover:bg-atlas-success/20 cursor-pointer">
               + Ajouter un niveau
             </button>
 
             {/* Totals */}
-            <div style={{background:c.elevated,borderRadius:8,padding:"8px 11px",
-              display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-              <span style={{fontSize:11,color:c.textMuted}}>Poids total W</span>
-              <span style={{fontSize:14,fontWeight:700,color:c.green,fontFamily:"monospace"}}>
-                {totalW.toFixed(0)} kN
-              </span>
+            <div className="flex justify-between items-center px-3 py-2 rounded-md bg-atlas-bg dark:bg-atlas-dark-bg mb-1.5">
+              <span className="text-[11px] text-atlas-text-muted dark:text-atlas-dark-text-muted">Poids total W</span>
+              <span className="text-sm font-bold font-mono text-atlas-success">{totalW.toFixed(0)} kN</span>
             </div>
-            <div style={{background:c.elevated,borderRadius:8,padding:"8px 11px",
-              display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:11,color:c.textMuted}}>Hauteur totale h<sub>n</sub></span>
-              <span style={{fontSize:14,fontWeight:700,color:c.purple,fontFamily:"monospace"}}>
-                {hn.toFixed(1)} m
-              </span>
+            <div className="flex justify-between items-center px-3 py-2 rounded-md bg-atlas-bg dark:bg-atlas-dark-bg">
+              <span className="text-[11px] text-atlas-text-muted dark:text-atlas-dark-text-muted">Hauteur totale h<sub>n</sub></span>
+              <span className="text-sm font-bold font-mono text-atlas-info">{hn.toFixed(1)} m</span>
             </div>
           </div>
         </div>
 
-        {/* ── COLUMN 3: Dynamic results ── */}
-        <div style={{flex:1,minWidth:260}}>
-          <div style={{background:c.surface,border:`1px solid ${c.border}`,borderRadius:14,padding:16}}>
-            <BlockHeader title="4 — Résultats analyse dynamique" color={c.amber} c={c}/>
+        {/* ── COL 3: Résultats dynamiques ──────────────────────────── */}
+        <div className="flex-1 min-w-64">
+          <div className="bg-atlas-card dark:bg-atlas-dark-card border border-atlas-card-border dark:border-atlas-dark-card-border rounded-xl p-4 border-l-[3px] border-l-atlas-warning">
+            <CardHeader title="4 — Résultats analyse dynamique" accent="amber" />
 
-            <div style={{background:c.elevated,border:`1px solid ${c.border}`,
-              borderRadius:8,padding:"9px 13px",marginBottom:14,
-              display:"flex",alignItems:"center",gap:10}}>
-              <div style={{width:8,height:8,borderRadius:"50%",background:c.borderLight,flexShrink:0}}/>
-              <span style={{fontSize:12,color:c.textMuted,flex:1}}>
+            {/* Connection status */}
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-md mb-4 bg-atlas-bg dark:bg-atlas-dark-bg border border-atlas-border dark:border-atlas-dark-border">
+              <div className="w-2 h-2 rounded-full bg-atlas-text-muted dark:bg-atlas-dark-text-muted flex-shrink-0" />
+              <span className="text-[12px] text-atlas-text-muted dark:text-atlas-dark-text-muted flex-1">
                 Robot / ETABS non connecté — saisie manuelle
               </span>
-              <button type="button" style={{padding:"5px 11px",borderRadius:6,cursor:"not-allowed",
-                background:c.border,border:"none",color:c.textMuted,fontSize:11}}>
+              <button type="button" disabled
+                className="px-2.5 py-1 rounded text-[11px] bg-atlas-border/50 dark:bg-atlas-dark-border text-atlas-text-muted dark:text-atlas-dark-text-muted cursor-not-allowed">
                 Importer
               </button>
             </div>
 
-            {/* Periods and dynamic shear */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+            {/* Periods and shear */}
+            <div className="grid grid-cols-2 gap-2.5 mb-4">
               {([
-                {label:"Période Tx (s)",      key:"Tx"  as const, color:c.blue,   val:seismic.Tx},
-                {label:"Période Ty (s)",      key:"Ty"  as const, color:c.purple, val:seismic.Ty},
-                {label:"Effort dyn. Vxd (kN)",key:"Vxd" as const, color:c.blue,   val:seismic.Vxd},
-                {label:"Effort dyn. Vyd (kN)",key:"Vyd" as const, color:c.purple, val:seismic.Vyd},
+                {label:"Période Tx (s)",       key:"Tx"  as const, cls:"text-atlas-info"},
+                {label:"Période Ty (s)",        key:"Ty"  as const, cls:"text-atlas-text-sec dark:text-atlas-dark-text-sec"},
+                {label:"Effort dyn. Vxd (kN)", key:"Vxd" as const, cls:"text-atlas-info"},
+                {label:"Effort dyn. Vyd (kN)", key:"Vyd" as const, cls:"text-atlas-text-sec dark:text-atlas-dark-text-sec"},
               ]).map(f => (
                 <div key={f.key}>
-                  <label style={{fontSize:11,color:c.textSec,display:"block",
-                    textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,marginBottom:4}}>
-                    {f.label}
-                  </label>
-                  <input type="number" value={f.val} step="0.01" min={0}
+                  <FieldLabel>{f.label}</FieldLabel>
+                  <input type="number" value={f.val ?? seismic[f.key]} step="0.01" min={0}
                     placeholder="—"
                     onChange={e => seismic.setField(f.key, e.target.value)}
-                    style={{width:"100%",background:c.elevated,border:`1px solid ${f.color}44`,
-                      borderRadius:8,padding:"8px 10px",color:f.color,
-                      fontSize:14,fontFamily:"monospace",outline:"none"}}/>
+                    className={`w-full px-2.5 py-2 rounded-md text-sm font-mono outline-none transition-colors bg-atlas-bg dark:bg-atlas-dark-bg border border-atlas-border dark:border-atlas-dark-border focus:border-atlas-gold ${f.cls}`}/>
                 </div>
               ))}
             </div>
 
-            {/* Per-floor displacements */}
-            <div style={{fontSize:11,letterSpacing:"0.06em",color:c.textSec,
-              textTransform:"uppercase",fontWeight:600,marginBottom:8}}>
+            {/* Displacements */}
+            <div className="text-[11px] uppercase tracking-[0.06em] font-semibold text-atlas-text-sec dark:text-atlas-dark-text-sec mb-2">
               Déplacements inter-étages relatifs (cm)
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 80px 80px",
-              gap:6,marginBottom:6}}>
-              {["Niveau","drx (cm)","dry (cm)"].map(h => (
-                <div key={h} style={{fontSize:10,color:c.textMuted,
-                  textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>{h}</div>
-              ))}
+            <div className="grid gap-1.5 mb-1.5 text-[10px] uppercase tracking-[0.06em] font-semibold text-atlas-text-muted dark:text-atlas-dark-text-muted [grid-template-columns:1fr_80px_80px]">
+              {["Niveau","drx (cm)","dry (cm)"].map(h => <div key={h}>{h}</div>)}
             </div>
-            <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:200,overflowY:"auto"}}>
+            <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
               {structural.stories.map(s => (
-                <div key={s.id} style={{display:"grid",gridTemplateColumns:"1fr 80px 80px",gap:6,alignItems:"center"}}>
-                  <div style={{fontSize:12,color:c.textSec,padding:"4px 0"}}>{s.name}</div>
-                  <input type="number" value={s.drx||""} step="0.001" min={0}
-                    placeholder="—"
+                <div key={s.id} className="grid gap-1.5 items-center [grid-template-columns:1fr_80px_80px]">
+                  <div className="text-[12px] text-atlas-text-sec dark:text-atlas-dark-text-sec py-1">{s.name}</div>
+                  <input type="number" value={s.drx||""} step="0.001" min={0} placeholder="—"
                     onChange={e => structural.updateStory(s.id, "drx", e.target.value)}
-                    style={{background:c.elevated,border:`1px solid ${c.blue}44`,
-                      borderRadius:6,padding:"5px 7px",color:c.blue,
-                      fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
-                  <input type="number" value={s.dry||""} step="0.001" min={0}
-                    placeholder="—"
+                    className="px-2 py-1 rounded text-[12px] font-mono outline-none bg-atlas-bg dark:bg-atlas-dark-bg border border-atlas-info/30 text-atlas-info focus:border-atlas-gold w-full"/>
+                  <input type="number" value={s.dry||""} step="0.001" min={0} placeholder="—"
                     onChange={e => structural.updateStory(s.id, "dry", e.target.value)}
-                    style={{background:c.elevated,border:`1px solid ${c.purple}44`,
-                      borderRadius:6,padding:"5px 7px",color:c.purple,
-                      fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
+                    className="px-2 py-1 rounded text-[12px] font-mono outline-none bg-atlas-bg dark:bg-atlas-dark-bg border border-atlas-border dark:border-atlas-dark-border text-atlas-text-sec dark:text-atlas-dark-text-sec focus:border-atlas-gold w-full"/>
                 </div>
               ))}
             </div>
 
             {/* Status summary */}
-            <div style={{marginTop:14,background:c.elevated,borderRadius:8,padding:"10px 12px"}}>
-              <div style={{fontSize:11,color:c.textMuted,marginBottom:6,
-                textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>
+            <div className="mt-4 p-3 rounded-md bg-atlas-bg dark:bg-atlas-dark-bg">
+              <div className="text-[11px] uppercase tracking-[0.06em] font-semibold text-atlas-text-muted dark:text-atlas-dark-text-muted mb-2">
                 Données disponibles
               </div>
               {[
-                {label:"Périodes Tx/Ty",     ok:!!(seismic.Tx && seismic.Ty)},
-                {label:"Efforts Vxd/Vyd",    ok:!!(seismic.Vxd && seismic.Vyd)},
-                {label:"Déplacements drx",   ok:structural.stories.some(s => s.drx)},
-                {label:"Déplacements dry",   ok:structural.stories.some(s => s.dry)},
+                {label:"Périodes Tx/Ty",   ok:!!(seismic.Tx && seismic.Ty)},
+                {label:"Efforts Vxd/Vyd",  ok:!!(seismic.Vxd && seismic.Vyd)},
+                {label:"Déplacements drx", ok:structural.stories.some(s => s.drx)},
+                {label:"Déplacements dry", ok:structural.stories.some(s => s.dry)},
               ].map(item => (
-                <div key={item.label} style={{display:"flex",alignItems:"center",gap:8,
-                  fontSize:12,color:item.ok ? c.green : c.textMuted,marginBottom:3}}>
-                  <span style={{fontSize:14}}>{item.ok ? "✅" : "○"}</span>
+                <div key={item.label} className={`flex items-center gap-2 text-[12px] mb-1 ${item.ok ? 'text-atlas-success' : 'text-atlas-text-muted dark:text-atlas-dark-text-muted'}`}>
+                  <span>{item.ok ? "✅" : "○"}</span>
                   {item.label}
                 </div>
               ))}
