@@ -1,6 +1,10 @@
 import { useUIStore } from '../../stores/uiStore'
 import { useAuthStore } from '../../stores/authStore'
+import { useProjectStore } from '../../stores/projectStore'
 import { getColors } from '../../theme'
+
+// Pages that require an open project before they can be accessed
+const PROJECT_REQUIRED = new Set(['params', 'spectrum', 'base_shear'])
 
 interface NavItem { id: string; label: string; icon: string; ready: boolean }
 interface NavGroup { section: string; items: NavItem[] }
@@ -41,6 +45,7 @@ const NAV: NavGroup[] = [
 export default function Sidebar() {
   const { theme, activePage, setActivePage, toggleTheme } = useUIStore()
   const { logout } = useAuthStore()
+  const { currentProjectId } = useProjectStore()
 
   const isDark = theme === 'dark'
   const c = getColors(isDark)
@@ -65,18 +70,22 @@ export default function Sidebar() {
             </div>
             {group.items.map(item => {
               const isActive = item.id === activePage
+              const needsProject = PROJECT_REQUIRED.has(item.id)
+              const disabled = !item.ready || (needsProject && !currentProjectId)
               return (
                 <button type="button" key={item.id}
-                  onClick={() => item.ready && setActivePage(item.id)}
+                  onClick={() => !disabled && setActivePage(item.id)}
+                  title={needsProject && !currentProjectId ? 'Ouvrez un projet d\'abord' : undefined}
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center',
                     gap: 9, padding: '8px 18px',
                     background: isActive ? (isDark ? '#1e3a5f' : '#dbeafe') : 'transparent',
                     border: 'none',
                     borderLeft: isActive ? `2px solid ${c.blue}` : '2px solid transparent',
-                    color: item.ready ? (isActive ? c.blue : c.textSec) : c.textMuted,
-                    cursor: item.ready ? 'pointer' : 'default',
+                    color: disabled ? c.textMuted : (isActive ? c.blue : c.textSec),
+                    cursor: disabled ? 'default' : 'pointer',
                     fontSize: 13, textAlign: 'left',
+                    opacity: needsProject && !currentProjectId ? 0.5 : 1,
                   }}>
                   <span style={{ fontSize: 14 }}>{item.icon}</span>
                   <span style={{ flex: 1 }}>{item.label}</span>

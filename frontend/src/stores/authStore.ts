@@ -7,6 +7,7 @@
 import { create } from 'zustand'
 import type { AuthState, User } from '../types/auth'
 import { apiLogin, apiRegister, apiRefreshToken, apiGetMe } from '../services/api'
+import { useUIStore } from './uiStore'
 
 const LS_ACCESS  = 'bunyan_access_token'
 const LS_REFRESH = 'bunyan_refresh_token'
@@ -28,6 +29,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user   = await apiGetMe(tokens.access_token)
       localStorage.setItem(LS_ACCESS,  tokens.access_token)
       localStorage.setItem(LS_REFRESH, tokens.refresh_token)
+      useUIStore.getState().resetToProjects()
       set({
         user,
         accessToken:     tokens.access_token,
@@ -49,6 +51,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user   = await apiGetMe(tokens.access_token)
       localStorage.setItem(LS_ACCESS,  tokens.access_token)
       localStorage.setItem(LS_REFRESH, tokens.refresh_token)
+      useUIStore.getState().resetToProjects()
       set({
         user,
         accessToken:     tokens.access_token,
@@ -66,6 +69,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout() {
     localStorage.removeItem(LS_ACCESS)
     localStorage.removeItem(LS_REFRESH)
+    useUIStore.getState().resetToProjects()
     set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false, error: null })
   },
 
@@ -101,8 +105,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return
     }
     set({ isLoading: true })
+
+    const AUTH_TIMEOUT_MS = 4000
+    function withTimeout<T>(p: Promise<T>): Promise<T> {
+      return Promise.race([
+        p,
+        new Promise<T>((_, reject) =>
+          setTimeout(() => reject(new Error('auth_timeout')), AUTH_TIMEOUT_MS)
+        ),
+      ])
+    }
+
     try {
-      const user = await apiGetMe(stored)
+      const user = await withTimeout(apiGetMe(stored))
       const refresh = localStorage.getItem(LS_REFRESH)
       set({
         user,
@@ -112,12 +127,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading:       false,
       })
     } catch {
-      // Token expired — try refresh
+      // Token expired, network error, or timeout — try refresh
       const refresh = localStorage.getItem(LS_REFRESH)
       if (refresh) {
         set({ refreshToken: refresh })
-        const ok = await get().refreshTokens()
-        if (!ok) set({ isLoading: false })
+        try {
+          const ok = await withTimeout(get().refreshTokens())
+          if (!ok) set({ isLoading: false })
+        } catch {
+          // Refresh timed out or failed — clear everything and show login
+          get().logout()
+          set({ isLoading: false })
+        }
       } else {
         localStorage.removeItem(LS_ACCESS)
         set({ isLoading: false })

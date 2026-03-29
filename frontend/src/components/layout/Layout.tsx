@@ -5,8 +5,11 @@ import ProjectList from '../general/ProjectList'
 import Topbar from './Topbar'
 import Sidebar from './Sidebar'
 import { useUIStore } from '../../stores/uiStore'
+import { useProjectStore } from '../../stores/projectStore'
 import { getColors } from '../../theme'
 import type { AppColors } from '../../types'
+
+const PROJECT_REQUIRED = new Set(['params', 'spectrum', 'base_shear'])
 
 function ComingSoon({ c }: { c: AppColors }) {
   return (
@@ -23,10 +26,15 @@ function ComingSoon({ c }: { c: AppColors }) {
 
 export default function Layout() {
   const { theme, activePage } = useUIStore()
+  const { currentProjectId } = useProjectStore()
   const isDark = theme === 'dark'
   const c = getColors(isDark)
 
   function renderPage() {
+    // If the requested page needs a project but none is open, fall back to the list
+    if (PROJECT_REQUIRED.has(activePage) && !currentProjectId) {
+      return <ProjectList c={c} />
+    }
     switch (activePage) {
       case 'projects':   return <ProjectList   c={c} />
       case 'params':     return <ProjectParams c={c} />

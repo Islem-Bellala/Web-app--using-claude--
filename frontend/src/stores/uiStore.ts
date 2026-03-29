@@ -13,6 +13,9 @@ function applyTheme(theme: ThemeMode) {
 const savedTheme = (localStorage.getItem('bunyan-theme') as ThemeMode | null) ?? 'light'
 applyTheme(savedTheme)
 
+const LS_ACTIVE_PAGE = 'bunyan-active-page'
+const savedPage = localStorage.getItem(LS_ACTIVE_PAGE) ?? 'projects'
+
 interface UIState {
   theme: ThemeMode;
   sidebarOpen: boolean;
@@ -22,12 +25,13 @@ interface UIState {
   toggleTheme: () => void;
   setSidebarOpen: (open: boolean) => void;
   setActivePage: (page: string) => void;
+  resetToProjects: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
   theme: savedTheme,
   sidebarOpen: true,
-  activePage: 'params',
+  activePage: savedPage,
 
   toggleTheme: () =>
     set((state) => {
@@ -36,5 +40,12 @@ export const useUIStore = create<UIState>((set) => ({
       return { theme: next }
     }),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
-  setActivePage: (page) => set({ activePage: page }),
+  setActivePage: (page) => {
+    localStorage.setItem(LS_ACTIVE_PAGE, page)
+    set({ activePage: page })
+  },
+  resetToProjects: () => {
+    localStorage.setItem(LS_ACTIVE_PAGE, 'projects')
+    set({ activePage: 'projects' })
+  },
 }));
