@@ -197,68 +197,170 @@ Each layer is independent and testable.
 ### 4.1 Fixed Viewport Layout — NO SCROLLING
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  TOPBAR (sticky)                          [≡] [🌙]  │
-├────────┬────────────────────────────────────────────┤
-│        │                                            │
-│  SIDE  │         MAIN CONTENT AREA                  │
-│  BAR   │                                            │
-│        │    Everything visible at once.              │
-│ (nav)  │    No full-page scrolling.                 │
-│        │    Panels, cards, tabs for overflow.        │
-│        │                                            │
-├────────┴────────────────────────────────────────────┤
-│  STATUS BAR (optional)                              │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│  TOPBAR (48px): بنيان Bunyan + project + save + user    │
+├────────┬────────────────────────────────────────────────┤
+│        │                                                │
+│  SIDE  │         MAIN CONTENT AREA                      │
+│  BAR   │                                                │
+│ (~200px│    Everything visible at once.                  │
+│  nav)  │    No full-page scrolling.                     │
+│        │    Only <main> scrolls.                        │
+│ Grouped│    Panels, cards, tabs for overflow.            │
+│ by code│                                                │
+│        │                                                │
+│ BIENTÔT│                                                │
+│ tags   │                                                │
+├────────┴────────────────────────────────────────────────┤
 ```
 
 **This is a single-page, fixed-viewport application.**
 
 - The entire page fits within `100vh × 100vw` — no full-page scrolling
+- Layout enforced by `Layout.tsx`: `h-screen w-screen overflow-hidden`
+- Only the `<main>` area scrolls (via `overflow-y: auto`)
 - Content that exceeds available space uses:
   - Tabs to switch between sections
   - Scrollable panels/cards within fixed containers
   - Collapsible sections
   - Modal overlays for detail views
 - Each "page" is a view that fills the main content area
-- Sidebar is fixed and toggleable, hamburger in sticky topbar
+- Sidebar is fixed and toggleable, hamburger in topbar
 - Think of it like ETABS or Robot: a professional desktop application in the browser
 
 ### 4.2 Design Identity
 
 - Modern, professional, engineering-focused
+- White/light background with clean cards and subtle borders
+- Multi-color accent system (blue, orange, green, purple, red — each with meaning)
 - Clean visual hierarchy with clear data presentation
 - Meaningful color coding for verification states:
   - ✅ OK (ratio < 0.9)
   - ⚠️ Warning (0.9 ≤ ratio ≤ 1.0)
   - ❌ Failure (ratio > 1.0)
-- Dark/light theme support
+- Dark/light theme support via `html.dark` class + Tailwind dark: variants
+- Theme persisted to `localStorage` as `bunyan-theme`
+- Anti-flash `<script>` in `<head>` applies dark class before React loads
 - French interface for Algerian engineers
 - Fluid interactions, minimal manual effort, minimal cognitive load
 - Intuitive data visualization (tables, charts, diagrams)
 
-### 4.3 Current UI Parameters (until Phase 6 redesign)
+### 4.3 ProjectParams — Two-Row Layout
 
-- `zoom: 1.35` on main content
-- `zoom: 1.08` on sidebar (height = 100vh / 1.08 for night mode button fix)
-- `zoom: 0.9` on ProjectParams page
-- Modals use `zoom: 1` (no scaling)
-- These will be replaced by a proper design system in Phase 6
+The ProjectParams page uses a two-row layout to fit within the viewport:
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ ROW 1 — Inputs (flex: 0 0 58%, 3 columns)                  │
+│                                                            │
+│  Col 1 (210px)    Col 2 (250px)    Col 3 (flex: 1)        │
+│  IDENTIFICATION   SISMIQUE         GÉOMÉTRIE ET MASSES     │
+│  Nom, ingénieur   Wilaya, commune  Stories table           │
+│  référence, date  zone, site       (N, H, W)              │
+│                   groupe, QF/R     Poids total, hn         │
+│                                                            │
+│  Each column: overflow-y: auto (independent scroll)        │
+├────────────────────────────────────────────────────────────┤
+│ ROW 2 — Results (flex: 1, full width)                      │
+│                                                            │
+│  4 — RÉSULTATS ANALYSE DYNAMIQUE                           │
+│  Left (320px): Tx/Ty/Vxd/Vyd 2×2 grid + status checklist  │
+│  Right (flex: 1): drx/dry displacements table (scrollable) │
+└────────────────────────────────────────────────────────────┘
+```
+
+### 4.4 Color Tokens (Tailwind v4)
+
+Colors are defined in `frontend/src/styles/globals.css` using CSS custom properties
+within a `@theme` block. Component-level colors use `frontend/src/theme.ts` which
+exports `DARK` and `LIGHT` constants and a `getColors()` helper.
+
+**No zoom: properties anywhere in the codebase.** Use proper font-size and padding.
+
+### 4.5 Sidebar Navigation Structure
+
+```
+GÉNÉRAL
+  ├── Projets
+  └── Paramètres généraux
+
+SISMIQUE — RPA 2024
+  ├── Spectre de réponse          ← standalone page (SpectrumChart.tsx)
+  ├── Combinaisons                ← standalone page (CombinationsPage.tsx) — NEW
+  └── Vérification sismique       ← tabbed page (SeismicVerificationPage.tsx) — NEW
+        ├── tab: Effort V            (base shear V + 80% check)
+        ├── tab: Déplacements        (Dk + inter-story drift limits)
+        ├── tab: P-Δ                 (θk stability check)
+        └── tab: Renversement        (overturning + sliding)
+
+FERRAILLAGE BA
+  ├── Poutres — CBA93             BIENTÔT
+  ├── Poteaux — CBA93             BIENTÔT
+  └── Voiles — CBA93              BIENTÔT
+
+CONNEXION
+  ├── Robot Structural            BIENTÔT
+  └── ETABS                       BIENTÔT
+```
+
+### 4.6 Vérification Sismique — Tabbed Page Layout
+
+The "Vérification sismique" page uses horizontal tabs within the fixed viewport.
+Each tab fills the same content area. No page scrolling — only local scroll
+where needed (e.g., drift table or P-Δ table for many stories).
+
+**Tab 1 — Effort V** (simplified from current BaseShearPage):
+- Base shear: V = λ·Sad(T₀)·W, Ft, λ logic, T₀ capping
+- 80% check: Vt ≥ 0.8·V, majoration coefficient
+- Robot export button (kept)
+- **REMOVED**: per-story force distribution (Fk) table and bar charts
+
+**Tab 2 — Déplacements** (§4.5.2 + §5.10):
+- Compute Dk = R × QF × Dek at each level (Eq 4.15)
+- Relative displacement Δk = Dk − Dk-1 (Eq 4.16)
+- Drift check: Δk vs Table 5.2 limits (non-effondrement + limitation de dommages)
+- Status per story: ✅/❌
+
+**Tab 3 — P-Δ** (§5.9):
+- θk = (Pk × Δk) / (Vk × hk) at each level (Eq 5.9)
+- Pk = cumulative weight above level k (Eq 5.10)
+- Verdict: θk < 0.10 → OK, 0.10–0.20 → amplify by 1/(1−θk), > 0.20 → unstable
+- Status per story: ✅/⚠️/❌
+
+**Tab 4 — Renversement** (§5.5):
+- M_renversement = Σ(Fi × hi) from lateral forces
+- M_stabilisant from vertical loads × building half-width
+- Coefficient: M_stab / M_renvers ≥ 1.3 (overturning)
+- Sliding check: coefficient ≥ 1.25 (if applicable)
+
+### 4.7 Bridge Architecture — Data Input Adapter
+
+The Robot/ETABS bridge does NOT change the verification pipeline. It is purely
+a data input adapter that fills the same store fields the engineer would fill manually:
+
+```
+Manual input  ─┐
+                ├──→ Same Zustand stores ──→ Same calc_engine ──→ Same results
+Robot bridge  ─┘
+```
+
+All verification modules work identically regardless of data source.
+The bridge is a future module — all MVP verifications work with manual input.
 
 ---
 
 ## 5. TECH STACK
 
-| Layer          | Technology                              |
-|----------------|-----------------------------------------|
-| Frontend       | React 18, TypeScript, Vite, Zustand     |
-| Styling        | Tailwind CSS (or design tokens)         |
-| Backend        | Python FastAPI, Pydantic                |
-| Database       | PostgreSQL, SQLAlchemy, Alembic         |
-| Auth           | JWT-based                               |
-| Engine         | Pure Python (no framework dependencies) |
-| Desktop Bridge | Python agent (local HTTP API)           |
-| Testing        | pytest (engine + backend), vitest (frontend) |
+| Layer          | Technology                                       |
+|----------------|--------------------------------------------------|
+| Frontend       | React 18, TypeScript, Vite, Zustand, Tailwind v4 |
+| Styling        | Tailwind CSS v4 + theme.ts color constants        |
+| Backend        | Python FastAPI, Pydantic                          |
+| Database       | PostgreSQL 18, SQLAlchemy 2.0, asyncpg, Alembic   |
+| Auth           | JWT (access + refresh tokens), bcrypt==4.0.1       |
+| Engine         | Pure Python (no framework dependencies)            |
+| Desktop Bridge | Python agent (local HTTP API) — future             |
+| Testing        | pytest (engine + backend), vitest (frontend)       |
 
 ---
 
@@ -272,12 +374,6 @@ bunyan/                                    # Project root
 ├── pyproject.toml
 ├── requirements.txt
 │
-├── docs/
-│   ├── architecture.md
-│   ├── session-log.md
-│   └── formulas/
-│       └── rpa2024-seismic.md
-│
 ├── calc_engine/                           # ALL engineering logic
 │   ├── __init__.py
 │   ├── seismic/
@@ -287,16 +383,21 @@ bunyan/                                    # Project root
 │   │       ├── spectrum.py              # Elastic spectrum Sae/g
 │   │       ├── design_spectrum.py       # Sad (Eq 3.15) + Svd (Eq 3.16)
 │   │       ├── base_shear.py            # V = λ·Sad·W (Eq 3.1)
-│   │       └── annex_a.py              # Wilaya/commune/zone — SINGLE SOURCE
+│   │       ├── annex_a.py              # Wilaya/commune/zone — SINGLE SOURCE
+│   │       ├── combinations.py          # Seismic load combinations (Eqs 5.1-5.4) — NEW
+│   │       ├── displacements.py         # Dk, Δk, drift check (Eqs 4.15-4.16, §5.10) — NEW
+│   │       ├── p_delta.py               # θk stability check (Eq 5.9) — NEW
+│   │       └── overturning.py           # Renversement + glissement (§5.5) — NEW
 │   ├── rc_design/                        # Future: CBA93, BAEL91, EC2
 │   │   └── __init__.py
 │   └── core/                             # Future: Unified Structural Model
 │       └── __init__.py
 │
 ├── backend/
-│   ├── main.py                           # FastAPI app entry
-│   ├── config.py                         # Pydantic BaseSettings
-│   ├── database.py                       # SQLAlchemy setup (Phase 5)
+│   ├── main.py                           # FastAPI app entry (CORS configured)
+│   ├── config.py                         # Pydantic BaseSettings (env vars)
+│   ├── database.py                       # Async SQLAlchemy 2.0 + asyncpg
+│   ├── dependencies.py                   # get_db dependency
 │   ├── api/
 │   │   └── v1/
 │   │       ├── __init__.py
@@ -304,60 +405,84 @@ bunyan/                                    # Project root
 │   │       └── endpoints/
 │   │           ├── spectrum.py
 │   │           ├── base_shear.py
-│   │           └── annex_a.py           # Serve wilaya/commune/zone data
+│   │           ├── annex_a.py           # Serve wilaya/commune/zone data
+│   │           ├── combinations.py      # Seismic load combinations — NEW
+│   │           ├── verifications.py     # Displacements, P-Δ, overturning — NEW
+│   │           ├── auth.py              # Register, login, refresh, me
+│   │           └── projects.py          # CRUD, JSONB state persistence
 │   ├── schemas/
 │   │   ├── seismic.py
 │   │   ├── annex_a.py
+│   │   ├── auth.py
+│   │   ├── project.py
 │   │   └── common.py
-│   ├── models/                           # SQLAlchemy models (Phase 5)
-│   │   └── __init__.py
-│   └── services/                         # Business logic orchestration
-│       └── __init__.py
+│   ├── models/
+│   │   ├── user.py                      # SQLAlchemy User model
+│   │   └── project.py                   # SQLAlchemy Project model (JSONB state)
+│   └── services/
+│       └── auth.py                      # JWT creation, password hashing
 │
 ├── frontend/
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── tsconfig.node.json
-│   ├── vite.config.ts
-│   ├── vite-env.d.ts
+│   ├── vite.config.ts                    # Proxy /api → localhost:8000
+│   ├── postcss.config.js                 # @tailwindcss/postcss plugin
+│   ├── index.html                        # Anti-flash <script>, entry: main.tsx
 │   └── src/
-│       ├── App.tsx                       # Thin layout shell (~207 lines)
-│       ├── main.tsx
-│       ├── types/                        # Shared TypeScript interfaces
+│       ├── App.tsx                       # Auth gate only (~29 lines)
+│       ├── main.tsx                      # Imports globals.css, renders App
+│       ├── theme.ts                      # DARK/LIGHT color constants + getColors()
+│       ├── types/
 │       │   ├── project.ts               # Story, GlobalParams
-│       │   ├── seismic.ts               # SpectrumRequest/Result, BaseShearRequest/Result, WilayaInfo, CommuneInfo
+│       │   ├── seismic.ts               # Spectrum/BaseShear request/result types
 │       │   ├── ui.ts                    # AppColors, ThemeMode, ModalBaseProps
+│       │   ├── auth.ts                  # User, AuthResponse types
+│       │   ├── persistence.ts           # ProjectState, saved/loaded shapes
 │       │   └── index.ts                 # Barrel export
-│       ├── stores/                       # Zustand state management
-│       │   ├── projectStore.ts          # 9 fields: wilaya, commune, zone, site, group, metadata
-│       │   ├── seismicStore.ts          # 20 fields: QF, R, periods, base shear, bracing systems
-│       │   ├── structuralStore.ts       # stories array with CRUD actions
-│       │   ├── uiStore.ts              # theme, sidebar, activePage
+│       ├── stores/
+│       │   ├── projectStore.ts          # Wilaya, commune, zone, site, group, project CRUD
+│       │   ├── seismicStore.ts          # QF, R, periods, base shear, bracing, twoDir
+│       │   ├── structuralStore.ts       # stories[] with CRUD actions
+│       │   ├── authStore.ts             # JWT tokens, user, login/logout/refresh
+│       │   ├── uiStore.ts              # Theme (dark/light), sidebar, activePage
 │       │   └── index.ts                 # Barrel export
-│       ├── services/                     # API client layer
-│       │   └── api.ts                   # Typed fetch functions with AbortController
-│       ├── components/
-│       │   ├── shared/
-│       │   │   ├── QFModal.tsx          # Quality factor modal (controlled component)
-│       │   │   └── RModal.tsx           # Behavior factor modal (controlled component)
-│       │   ├── layout/                   # Placeholder for Phase 6
-│       │   │   └── .gitkeep
-│       │   ├── general/
-│       │   │   └── ProjectParams.tsx    # Reads from all stores directly
-│       │   └── seismic/
-│       │       ├── SpectrumChart.tsx     # Reads from project+seismic stores
-│       │       └── BaseShearPage.tsx    # Reads from project+seismic+structural stores
-│       └── styles/
-│           └── .gitkeep
+│       ├── services/
+│       │   └── api.ts                   # Typed fetch + AbortController + 401→refresh→retry
+│       ├── styles/
+│       │   └── globals.css              # @import "tailwindcss", @theme block, dark mode
+│       └── components/
+│           ├── auth/
+│           │   └── LoginPage.tsx         # Full-page login (outside Layout)
+│           ├── layout/
+│           │   ├── Layout.tsx            # Fixed viewport: 100vh × 100vw overflow-hidden
+│           │   ├── Topbar.tsx            # 48px: logo, project name, save, theme, user
+│           │   └── Sidebar.tsx           # Nav groups, BIENTÔT tags, logout, theme toggle
+│           ├── shared/
+│           │   ├── QFModal.tsx           # Quality factor modal (controlled component)
+│           │   └── RModal.tsx            # Behavior factor modal (controlled component)
+│           ├── general/
+│           │   ├── ProjectParams.tsx     # Two-row layout (3 input cols + results row)
+│           │   └── ProjectList.tsx       # Project selection / create new
+│           └── seismic/
+│               ├── SpectrumChart.tsx     # Sad + Svd charts, X/Y directions, .txt export
+│               ├── CombinationsPage.tsx  # Seismic load combinations (standalone page)
+│               ├── SeismicVerificationPage.tsx  # Tabbed: Effort V, Déplacements, P-Δ, Renversement
+│               └── BaseShearPage.tsx     # V, 80% check, majoration (tab inside verification page)
 │
 ├── tests/
 │   ├── engine/
 │   │   └── seismic/
-│   │       ├── test_spectrum.py
+│   │       ├── test_spectrum.py          # 23 tests
 │   │       ├── test_base_shear.py
-│   │       └── test_annex_a.py
+│   │       └── test_annex_a.py           # 29 tests
 │   └── backend/
-│       └── __init__.py
+│       ├── test_auth.py                  # 9 tests
+│       └── test_projects.py              # 10 tests + 2 new in Phase 6
+│
+├── alembic/                               # Database migrations
+│   ├── alembic.ini
+│   └── versions/                          # users + projects tables
 │
 └── bridge/                               # Future: desktop bridge agent
     ├── __init__.py
@@ -386,9 +511,10 @@ bunyan/                                    # Project root
 - Endpoints in `backend/api/v1/endpoints/`
 - Request/response models in `backend/schemas/`
 - Endpoints MUST NOT contain engineering logic — only call engine functions
-- Use Pydantic BaseSettings for configuration
+- Use Pydantic BaseSettings for configuration (`backend/config.py`)
 - RESTful with versioning: `/api/v1/`
-- Route groups: `/projects`, `/models`, `/calculations`, `/reports`
+- Auth: JWT stateless, 401→refresh→retry handled by frontend
+- Project persistence: normalized metadata + JSONB state column (opaque blob)
 
 ### Frontend (`frontend/src/`)
 
@@ -396,8 +522,10 @@ bunyan/                                    # Project root
 - Shared types in `frontend/src/types/`
 - State management via Zustand stores in `frontend/src/stores/`
 - API calls via `frontend/src/services/api.ts` — never raw fetch in components
+- API base URL: relative `/api/v1` through Vite proxy (no hardcoded localhost)
 - Components read from stores, not prop drilling from App.tsx
 - Modals are controlled components (receive props, don't couple to stores)
+- Color constants in `theme.ts`, CSS tokens in `globals.css`
 - All user-facing text: French
 - All code, comments, variable names: English
 
@@ -408,19 +536,22 @@ bunyan/                                    # Project root
 - Test names: `test_<function>_<scenario>`
 - Use pytest parametrize for multiple input cases
 - No calculation module is complete without passing tests
+- Backend tests use isolated per-test async engines (Windows-compatible)
+- Total: 73 tests passing (52 engine + 21 backend)
 
 ---
 
 ## 8. ZUSTAND STORE ARCHITECTURE
 
-### Store Layout (implemented in Phase 3)
+### Store Layout (5 stores)
 
 | Store | Fields | Responsibility |
 |-------|--------|---------------|
-| `projectStore` | 9 fields, 7 actions | Location (wilaya, commune, zone), site classification, project metadata |
-| `seismicStore` | 20 fields, 7 actions | QF/R params, bracing system, periods, base shear results, two-direction mode |
+| `projectStore` | wilayaCode, commune, zone, site, group, wilayas[], communes[], currentProjectId, projects[], metadata | Location, site classification, project CRUD, persistence |
+| `seismicStore` | twoDir, QF/R params, frameSys, Tx, Ty, Vxd, Vyd, + 12 more | QF/R parameters, bracing system, periods, base shear results |
 | `structuralStore` | stories[], 5 actions | Building stories with elevation, weight, drift ratios |
-| `uiStore` | 3 fields, 3 actions | Theme (dark/light), sidebar state, active page |
+| `authStore` | user, accessToken, refreshToken, isAuthenticated, login/logout/refresh | JWT authentication, token management |
+| `uiStore` | theme, sidebarOpen, activePage | Theme (dark/light with localStorage), sidebar state, navigation |
 
 ### Patterns
 
@@ -428,21 +559,55 @@ bunyan/                                    # Project root
 - **Batch setter**: `setQFParams(partial)`, `setRParams(partial)` for related field groups
 - **Modals**: Use Option B — controlled components receiving data via props from parent
 - **Components**: Import stores directly, no props drilling through App.tsx
+- **Expand existing stores** — don't create new stores unless strong architectural reason
 
 ### Component → Store Mapping
 
 | Component | Reads from |
 |-----------|-----------|
-| App.tsx | uiStore (theme, sidebar, activePage) |
+| App.tsx | authStore (isAuthenticated) |
+| Layout.tsx | uiStore (sidebarOpen, activePage) |
+| Topbar.tsx | projectStore + authStore + uiStore |
+| Sidebar.tsx | uiStore + authStore |
 | ProjectParams | projectStore + seismicStore + structuralStore |
 | SpectrumChart | projectStore + seismicStore |
 | BaseShearPage | projectStore + seismicStore + structuralStore |
+| ProjectList | projectStore + authStore |
+| LoginPage | authStore |
 | QFModal | props from parent (controlled) |
 | RModal | props from parent (controlled) |
 
 ---
 
-## 9. LANGUAGE RULES
+## 9. AUTH & DATABASE
+
+### Authentication
+
+- JWT-based: access token (short-lived) + refresh token (long-lived)
+- Endpoints: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `GET /auth/me`
+- Password hashing: `passlib` + `bcrypt==4.0.1` (pinned for compatibility)
+- Frontend: `authStore` manages tokens, `api.ts` handles 401→refresh→retry
+- Each user can only access their own projects
+
+### Database
+
+- PostgreSQL 18 (local: `bunyan` database, user `postgres`, port 5432)
+- Connection: `postgresql+asyncpg://postgres:postgres@localhost:5432/bunyan`
+- Async SQLAlchemy 2.0 + asyncpg
+- Alembic for migrations
+- Tables: `users`, `projects`
+
+### Project Persistence (Hybrid Model)
+
+- **Normalized columns**: id, name, user_id, created_at, updated_at
+- **JSONB state column**: opaque blob containing all engineering state
+- JSONB scope (persisted): wilayaCode, commune, zone, site, group, seismic parameters, stories[]
+- Runtime-only (NOT persisted): reference data arrays (wilayas[], communes[]), loading flags, navigation state
+- loadProject cycle: reset stores → hydrate from JSONB → re-derive computed values
+
+---
+
+## 10. LANGUAGE RULES
 
 - **Application interface**: French (for Algerian engineers)
 - **Code, comments, variables, git commits**: English
@@ -452,7 +617,7 @@ bunyan/                                    # Project root
 
 ---
 
-## 10. GIT CONVENTIONS
+## 11. GIT CONVENTIONS
 
 - Branch naming: `feature/<module>`, `fix/<issue>`, `refactor/<scope>`
 - Commit messages: imperative mood, reference the module
@@ -460,10 +625,23 @@ bunyan/                                    # Project root
   - `Refactor SpectrumChart to use seismic store`
 - Atomic commits: one logical change per commit
 - Always run tests before committing
+- `main` branch is always deployable — never push broken code to main
+
+### Branch Workflow (Production)
+
+```
+main ────── always deployable, auto-deploys to production
+  │
+  ├── feature/seismic-combinations  ← build here
+  ├── fix/auth-flow                 ← bug fixes here
+  └── feature/cba93-beams           ← future modules here
+```
+
+Work on feature branches. Test locally. Merge to main when ready.
 
 ---
 
-## 11. DATA VALIDATION & ERROR HANDLING
+## 12. DATA VALIDATION & ERROR HANDLING
 
 ### Data Validation
 
@@ -479,20 +657,24 @@ The system must handle:
 - Incomplete load cases
 - API connection failures
 - Bridge disconnection
+- Auth token expiry (401→refresh→retry)
 
 Errors must be descriptive, logged, and user-friendly (in French).
 
 ---
 
-## 12. SECURITY
+## 13. SECURITY
 
-- JWT-based authentication
+- JWT-based authentication (access + refresh tokens)
 - Each user can only access their own projects
+- CORS configured for allowed origins
 - Secure communication between bridge and backend (local token or key)
+- Environment variables for secrets (DATABASE_URL, JWT_SECRET, etc.)
+- Never commit credentials — use `.env` files
 
 ---
 
-## 13. ENGINEERING FORMULAS — WORKING RULES
+## 14. ENGINEERING FORMULAS — WORKING RULES
 
 1. **Observations before code** — present all findings and observations first
 2. **If a formula is uncertain → ASK before coding** — never guess
@@ -500,56 +682,71 @@ Errors must be descriptive, logged, and user-friendly (in French).
 4. **Include formula module reference** at the top of each file
 5. **Cross-reference** with RPA 2024 (DTR BC 2.48) uploaded source documents
 6. **Always check uploaded project files** before implementing any formula
-   (RPA 2024 chapters are uploaded as project knowledge)
 
 ---
 
-## 14. CURRENT STATE
+## 15. CURRENT STATE
 
-### Completed Foundation Phases
+### All Foundation Phases Complete
 
 - ✅ **Phase 1**: Project restructure, CLAUDE.md, annex_a.py, central router, config
-- ✅ **Phase 2**: Full TypeScript migration, shared types, typed API service
-- ✅ **Phase 3**: Zustand stores (4 stores), all components rewired, App.tsx is thin shell
+- ✅ **Phase 2**: Full TypeScript migration (0 tsc errors, all .tsx)
+- ✅ **Phase 3**: Zustand stores (4→5 stores), App.tsx thin shell
+- ✅ **Phase 4**: Data deduplication — single source of truth (annex_a.py → API → frontend)
+- ✅ **Phase 5**: PostgreSQL + JWT auth (async SQLAlchemy, Alembic, project CRUD)
+- ✅ **Phase 6**: UI structural fix (fixed viewport, Tailwind v4, two-row layout, branding, dark mode)
 
 ### Completed Engineering Modules
 
-- ✅ **Elastic spectrum** Sae/g — `calc_engine/seismic/rpa2024/spectrum.py`
-- ✅ **Design spectrum** Sad Eq 3.15 — `calc_engine/seismic/rpa2024/design_spectrum.py`
-- ✅ **Design spectrum** Svd Eq 3.16 — `calc_engine/seismic/rpa2024/design_spectrum.py`
-- ✅ **Base shear** V = λ·Sad·W Eq 3.1 — `calc_engine/seismic/rpa2024/base_shear.py`
-- ✅ **Annex A** — 58 wilayas, commune-level zones (single source in calc_engine)
-- ✅ **FastAPI endpoints** — spectrum, base_shear, annex_a (wilayas, communes, zone)
-- ✅ **React pages** — ProjectParams, SpectrumChart, BaseShearPage
-- ✅ **23 spectrum/base_shear tests + 29 annex_a tests = 52 total**
+- ✅ **Elastic spectrum** Sae/g — `spectrum.py`
+- ✅ **Design spectrum** Sad Eq 3.15 + Svd Eq 3.16 — `design_spectrum.py`
+- ✅ **Base shear** V = λ·Sad·W Eq 3.1 — `base_shear.py`
+- ✅ **Annex A** — 58 wilayas, 35 split wilayas, commune-level zones — `annex_a.py`
+- ✅ **FastAPI endpoints** — spectrum, base_shear, annex_a, auth, projects
+- ✅ **React pages** — ProjectParams, SpectrumChart, BaseShearPage, ProjectList, LoginPage
+- ✅ **73 passing tests** (52 engine + 21 backend)
 
-### Pending Foundation Phases
+### Verified Annex A Corrections
 
-- 🔄 **Phase 4**: Data deduplication + API layer cleanup ← NEXT
-- 🔄 **Phase 5**: PostgreSQL + auth
-- 🔄 **Phase 6**: Fixed viewport UI redesign
+- 35 split wilayas (not 25) with commune-level zone overrides
+- El Bayadh: default zone II, four communes at zone I
+- Jijel commune: "Erraguene" (corrected from "El Taguene")
+- 11 wilaya default zones corrected
+- 6 wrong zone values fixed across wilayas 20, 24, 25, 28, 29, 31
 
-### Pending — Phase 4 Specifics
+### Known Issues (Pre-Deploy Fixes)
 
-- ProjectParams.tsx and SpectrumChart.tsx still have hardcoded WILAYAS/WILAYA_COMMUNES data
-- Components should fetch this data from backend API instead
-- All engineering computation should flow through api.ts service, not direct fetch()
-- Zone derivation should use backend endpoint
+- Auth flow: app hangs on "Chargement..." on first load, skips login on refresh
+- Correct flow should be: Login → Projects list → ProjectParams
+- Default activePage should be 'projects' (not 'params') after login
+- BaseShearPage: remove per-story Fk distribution table and bar charts (keep base shear + 80% check)
 
-### Future Modules
+### MVP Scope (Pre-First-Deploy)
 
-- ⏳ Seismic combinations
-- ⏳ RC design — CBA93
+1. ⬜ Fix auth flow (login → projects → params)
+2. ⬜ Simplify BaseShearPage (remove Fk table + bar charts, keep Robot export)
+3. ⬜ Seismic combinations module — §5.2 (standalone page)
+4. ⬜ Displacement calculation — §4.5.2 Dk + §5.10 drift check (tab in verification page)
+5. ⬜ P-Δ effect — §5.9 θk stability (tab in verification page)
+6. ⬜ Overturning check — §5.5 renversement + glissement (tab in verification page)
+7. ⬜ Integrate all into SeismicVerificationPage with horizontal tabs
+8. ⬜ Deploy to production
+
+### Future Modules (Post-Deploy)
+
+- ⏳ Joints sismiques — §5.8 (deferred, not needed for MVP)
+- ⏳ RC design — CBA93 (Beams → Columns → Walls → Foundations)
 - ⏳ RC design — BAEL91
 - ⏳ RC design — Eurocode 2
-- ⏳ Desktop bridge (Robot, ETABS)
-- ⏳ Report generation
+- ⏳ Desktop bridge (Robot first, then ETABS) — data input adapter only
+- ⏳ Report generation (PDF, Word)
 - ⏳ Verification dashboard
 
 ---
 
-## 15. KEY FORMULAS IMPLEMENTED
+## 16. KEY FORMULAS
 
+### Implemented
 - `Sad(T)/g` — Eq 3.15 (4 branches + floor 0.2·A·I)
 - `Svd(T)/g` — Eq 3.16 (alpha exponent, R=1.5 fixed)
 - `QF = 1 + ΣPq` — capped per category
@@ -559,28 +756,64 @@ Errors must be descriptive, logged, and user-friendly (in French).
 - `T₀ = min(T_calc, 1.3·T_emp)`
 - 80% check: `Vt ≥ 0.8·V`, majoration coeff = 0.8·V/Vt
 
+### To Implement (MVP)
+- **Combinations (§5.2)**: `G + ψQ ± E`, `E1 = ±Ex ± 0.3Ey`, `E2 = ±0.3Ex ± Ey`
+  Vertical component Ez added if `Av·I·g > 0.25g` → E3, E4, E5 (up to 24 combos)
+- **Displacements (§4.5.2)**: `Dk = R × QF × Dek` (Eq 4.15), `Δk = Dk − Dk-1` (Eq 4.16)
+- **Drift check (§5.10)**: `Δk < limits` from Table 5.2 (non-effondrement + limitation de dommages)
+- **P-Δ (§5.9)**: `θk = (Pk × Δk) / (Vk × hk)` (Eq 5.9), `Pk = Σ(Gi + ψQi)` for i≥k (Eq 5.10)
+  θk < 0.10 → OK; 0.10–0.20 → amplify by 1/(1−θk); > 0.20 → unstable
+- **Overturning (§5.5)**: `M_stab / M_renvers ≥ 1.3`, sliding coefficient ≥ 1.25
+
 ---
 
-## 16. PROGRESSIVE DEVELOPMENT STRATEGY
+## 17. DEPLOYMENT STRATEGY
+
+### Ship Early, Iterate in Production
+
+The project follows a "deploy MVP, then iterate" approach:
+
+1. **MVP**: Complete RPA 2024 seismic verification (all Chapter 4+5 checks) → deploy
+2. **Iterate**: Use the live app, collect feedback, fix bugs
+3. **Expand**: Add RC modules (CBA93/BAEL91/EC2) and Robot bridge as live updates
+
+### Deployment Target: Railway
+
+- Backend: FastAPI served by uvicorn
+- Frontend: Vite build → static files served by backend or separate service
+- Database: Railway-managed PostgreSQL
+- Environment: all secrets via env vars (DATABASE_URL, JWT_SECRET, etc.)
+- Auto-deploy: push to `main` → Railway rebuilds and deploys
+
+### Pre-Deployment Checklist
+
+- [ ] Auth flow working correctly (login → projects → params)
+- [ ] BaseShearPage simplified (Fk table + bar charts removed)
+- [ ] Seismic combinations page complete (§5.2)
+- [ ] Displacement + drift check tab complete (§4.5.2 + §5.10)
+- [ ] P-Δ tab complete (§5.9)
+- [ ] Overturning tab complete (§5.5)
+- [ ] SeismicVerificationPage with 4 tabs working
+- [ ] CORS configured for production domain
+- [ ] Environment variables for all secrets
+- [ ] Alembic migrations run on production DB
+- [ ] Build succeeds (`npm run build` + backend starts)
+
+---
+
+## 18. PROGRESSIVE DEVELOPMENT STRATEGY
+
+### Design Code Order
+
+1. **RPA 2024** (DTR BC 2.48) — Seismic *(MVP — in progress)*
+2. **CBA93** — RC design (Algerian code)
+3. **BAEL91** — RC design (French code)
+4. **Eurocode 2** — RC design (European code)
 
 ### Software Integration Order
 
 1. Robot Structural Analysis
 2. ETABS
-
-### Design Code Order
-
-1. CBA93
-2. BAEL91
-3. Eurocode 2
-
-### Feature Development Order
-
-**Step 1** — RPA 2024 spectral response + seismic verification *(in progress)*
-**Step 2** — CBA93 reinforced concrete design: Beams → Columns → Shear Walls → Foundations
-**Step 3** — BAEL91 modules
-**Step 4** — Eurocode 2 modules
-**Step 5** — Repeat full workflow for ETABS
 
 ### Future Scalability
 
@@ -593,7 +826,7 @@ New modules must plug into the existing architecture cleanly.
 
 ---
 
-## 17. COMMON PATTERNS
+## 19. COMMON PATTERNS
 
 ### Adding a New Engine Module
 
@@ -613,24 +846,15 @@ New modules must plug into the existing architecture cleanly.
 ### Adding a New React Page
 
 1. Create component in `frontend/src/components/<domain>/`
-2. Use Zustand store for state — NO props from App.tsx
-3. Use `api.ts` service for backend calls
+2. Use Zustand store for state — import stores directly
+3. Use `api.ts` service for backend calls (relative `/api/v1` URLs)
 4. Respect fixed viewport layout — no full-page scrolling
-5. All user-facing text in French, all code in English
+5. Use `theme.ts` colors via `getColors()` helper
+6. All user-facing text in French, all code in English
 
 ---
 
-## 18. PERFORMANCE & MONITORING
-
-- Calculations optimized for large models
-- Asynchronous processing where necessary
-- Long calculations support background jobs
-- Log all calculations, errors, and API calls
-- Logs sufficient to debug engineering issues
-
----
-
-## 19. DESIGN SUGGESTIONS (FUTURE)
+## 20. DESIGN SUGGESTIONS (FUTURE)
 
 When elements fail verification, the system may suggest corrections:
 
@@ -641,7 +865,7 @@ When elements fail verification, the system may suggest corrections:
 
 ---
 
-## 20. REPORT GENERATION (FUTURE)
+## 21. REPORT GENERATION (FUTURE)
 
 Export formats: PDF, Word
 
@@ -657,7 +881,7 @@ Export levels: Summary / Standard / Detailed
 
 ---
 
-## 21. SUPPORTED SOFTWARE APIs
+## 22. SUPPORTED SOFTWARE APIs (FUTURE)
 
 ### ETABS
 
@@ -679,29 +903,3 @@ A lightweight Python agent runs locally:
 - Send generated data back to software
 - Expose a local HTTP API
 - Communicate with the web application
-
----
-
-## 22. UNIFIED STRUCTURAL MODEL (FUTURE)
-
-| Entity      | Fields                                           |
-|-------------|--------------------------------------------------|
-| Node        | id, x, y, z                                     |
-| Member      | id, start_node, end_node, section, material, type|
-| LoadCase    | name, type                                       |
-| MemberForce | member_id, load_combination, N, V2, V3, M2, M3  |
-
-The calculation engine works exclusively with USM entities.
-
----
-
-## 23. DATABASE STRUCTURE (FUTURE — Phase 5)
-
-- Projects
-- Models
-- Calculations
-- Results
-- Reports
-
-Each user can only access their own projects.
-Multiple calculations per model allowed for comparison.
