@@ -1,5 +1,5 @@
 /**
- * StructCalc — RPA 2024 Spectrum Visualizer (Phase 3)
+ * Bunyan — RPA 2024 Spectrum Visualizer (Phase 3)
  * Reads seismic parameters from Zustand stores — no more props drilling.
  *
  * Code references:

@@ -1,5 +1,5 @@
 /**
- * StructCalc — Effort Tranchant à la Base (Phase 3)
+ * Bunyan — Effort Tranchant à la Base (Phase 3)
  * RPA 2024 §4.2 — Méthode Statique Équivalente
  * Reads all parameters from Zustand stores — no more props drilling.
  *

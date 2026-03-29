@@ -1,0 +1,111 @@
+/* ── Google Fonts ────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;700&display=swap');
+
+@import "tailwindcss";
+
+/* ── Dark mode via .dark class on <html> ─────────────────────────────────── */
+@variant dark (&:where(.dark, .dark *));
+
+/* ── Bunyan theme tokens ─────────────────────────────────────────────────── */
+@theme {
+  /* Fonts */
+  --font-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-arabic: 'Noto Sans Arabic', 'IBM Plex Sans', sans-serif;
+
+  /* Surfaces — light */
+  --color-bunyan-bg:      #f8fafc;
+  --color-bunyan-surface: #ffffff;
+  --color-bunyan-elevated:#f1f5f9;
+
+  /* Surfaces — dark */
+  --color-bunyan-dark-bg:       #020817;
+  --color-bunyan-dark-surface:  #0a1628;
+  --color-bunyan-dark-elevated: #0f172a;
+
+  /* Borders — light */
+  --color-bunyan-border:       #e2e8f0;
+  --color-bunyan-border-light: #cbd5e1;
+
+  /* Borders — dark */
+  --color-bunyan-dark-border:       #1e293b;
+  --color-bunyan-dark-border-light: #475569;
+
+  /* Text — light */
+  --color-bunyan-text:       #0f172a;
+  --color-bunyan-text-sec:   #475569;
+  --color-bunyan-text-muted: #94a3b8;
+
+  /* Text — dark */
+  --color-bunyan-dark-text:       #f1f5f9;
+  --color-bunyan-dark-text-sec:   #cbd5e1;
+  --color-bunyan-dark-text-muted: #94a3b8;
+
+  /* Accent — light */
+  --color-bunyan-blue:   #2563eb;
+  --color-bunyan-green:  #059669;
+  --color-bunyan-amber:  #d97706;
+  --color-bunyan-red:    #dc2626;
+  --color-bunyan-purple: #7c3aed;
+
+  /* Accent — dark */
+  --color-bunyan-dark-blue:   #60a5fa;
+  --color-bunyan-dark-green:  #34d399;
+  --color-bunyan-dark-amber:  #fbbf24;
+  --color-bunyan-dark-red:    #f87171;
+  --color-bunyan-dark-purple: #c4b5fd;
+}
+
+/* ── Component utilities ─────────────────────────────────────────────────── */
+@layer utilities {
+  .font-arabic {
+    font-family: 'Noto Sans Arabic', 'IBM Plex Sans', sans-serif;
+  }
+}
+
+/* ── Base styles ─────────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    height: 100%;
+    overflow: hidden;
+    font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+
+  html.dark {
+    background-color: #020817;
+    color: #f1f5f9;
+  }
+
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  select {
+    font-family: inherit;
+  }
+}
+
+/* ── Scrollbars ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+html.dark ::-webkit-scrollbar-thumb { background: #1e293b; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }

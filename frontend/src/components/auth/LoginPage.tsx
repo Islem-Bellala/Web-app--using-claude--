@@ -74,7 +74,7 @@ export default function LoginPage({ c, isDark }: LoginPageProps) {
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: c.text, letterSpacing: '-0.02em' }}>
-            StructCalc
+            بنيان Bunyan
           </div>
           <div style={{ fontSize: 11, color: c.textMuted, marginTop: 3 }}>
             RPA 2024 · CBA93 · BAEL91
