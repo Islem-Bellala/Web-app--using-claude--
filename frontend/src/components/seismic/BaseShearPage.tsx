@@ -12,11 +12,7 @@
  */
 
 import { useState } from "react"
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Cell, ResponsiveContainer,
-} from "recharts"
-import type { AppColors, BaseShearResult, StoryForce } from "../../types"
+import type { AppColors, BaseShearResult } from "../../types"
 import { useProjectStore, useSeismicStore, useStructuralStore } from "../../stores"
 import { computeBaseShear } from "../../services/api"
 
@@ -39,32 +35,6 @@ function ResultCard({ label, value, unit, accent, c }: ResultCardProps) {
       {unit && <div style={{fontSize:10,color:c.textMuted,marginTop:2}}>{unit}</div>}
     </div>
   )
-}
-
-interface ForceTooltipProps {
-  active?: boolean;
-  payload?: Array<{ payload: StoryForce & { name: string } }>;
-  c: AppColors;
-}
-function ForceTooltip({ active, payload, c }: ForceTooltipProps) {
-  if (!active||!payload?.length) return null
-  const d = payload[0].payload
-  return (
-    <div style={{background:c.elevated,border:`1px solid ${c.borderLight}`,
-      borderRadius:8,padding:"9px 13px",fontSize:12}}>
-      <div style={{color:c.text,fontWeight:700,marginBottom:4}}>{d.name}</div>
-      <div style={{color:c.textMuted}}>h = <b style={{color:c.text}}>{d.elevation} m</b></div>
-      <div style={{color:c.textMuted}}>Wi = <b style={{color:c.text}}>{d.weight} kN</b></div>
-      <div style={{color:c.textMuted}}>Fi = <b style={{color:c.blue,fontSize:14}}>{d.Fi.toFixed(1)} kN</b></div>
-    </div>
-  )
-}
-
-function barColor(Fi: number, maxFi: number, c: AppColors): string {
-  const r = maxFi > 0 ? Fi/maxFi : 0
-  if (r < 0.5) return c.blue
-  if (r < 0.8) return c.amber
-  return c.red
 }
 
 interface Check80Props {
@@ -125,8 +95,6 @@ interface DirectionPanelProps {
 
 function DirectionPanel({ dir, result, Vdyn, color, c }: DirectionPanelProps) {
   if (!result) return null
-  const maxFi = Math.max(...result.story_forces.map(s => s.Fi))
-  const chartData = [...result.story_forces].reverse()
 
   return (
     <div style={{flex:1,minWidth:280,display:"flex",flexDirection:"column",gap:12}}>
@@ -161,69 +129,6 @@ function DirectionPanel({ dir, result, Vdyn, color, c }: DirectionPanelProps) {
       </div>
 
       <Check80 label={`Sens ${dir}`} Vdyn={Vdyn} Vstat={result.V} c={c}/>
-
-      <div style={{background:c.surface,border:`1px solid ${c.border}`,
-        borderRadius:10,padding:"14px 12px 10px"}}>
-        <div style={{fontSize:11,color:c.textSec,marginBottom:10,fontWeight:600}}>
-          Distribution Fi — Dir. {dir} <span style={{color,fontWeight:400}}>Éq.4.2</span>
-        </div>
-        <ResponsiveContainer width="100%" height={result.story_forces.length*40+20}>
-          <BarChart data={chartData} layout="vertical"
-            margin={{top:0,right:45,bottom:0,left:52}}>
-            <CartesianGrid stroke={c.border} strokeDasharray="4 4" horizontal={false}/>
-            <XAxis type="number" tick={{fill:c.textSec,fontSize:10}}
-              tickFormatter={(v: number) => v.toFixed(0)}/>
-            <YAxis type="category" dataKey="name" tick={{fill:c.textSec,fontSize:10}} width={48}/>
-            <Tooltip content={<ForceTooltip c={c}/>}/>
-            <Bar dataKey="Fi" radius={[0,4,4,0]}>
-              {chartData.map((entry,i) => (
-                <Cell key={i} fill={barColor(entry.Fi, maxFi, c)}/>
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div style={{background:c.surface,border:`1px solid ${c.border}`,
-        borderRadius:10,overflow:"hidden",fontSize:11}}>
-        <table style={{width:"100%",borderCollapse:"collapse"}}>
-          <thead>
-            <tr style={{background:c.elevated}}>
-              {["Niveau","h(m)","Wi","Wi·hi","ratio","Fi(kN)"].map(h => (
-                <th key={h} style={{padding:"6px 8px",textAlign:"right",
-                  color:c.textSec,fontWeight:600,fontSize:10,
-                  letterSpacing:"0.05em",textTransform:"uppercase",
-                  borderBottom:`1px solid ${c.border}`,
-                  ...(h==="Niveau"?{textAlign:"left" as const}:{})}}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {[...result.story_forces].reverse().map((sf,i) => (
-              <tr key={i} style={{background:i%2===0?"transparent":c.elevated+"66"}}>
-                <td style={{padding:"5px 8px",color:c.text,fontWeight:600}}>{sf.name}</td>
-                <td style={{padding:"5px 8px",textAlign:"right",color:c.textSec,fontFamily:"monospace"}}>{sf.elevation.toFixed(1)}</td>
-                <td style={{padding:"5px 8px",textAlign:"right",color:c.green, fontFamily:"monospace"}}>{sf.weight.toFixed(0)}</td>
-                <td style={{padding:"5px 8px",textAlign:"right",color:c.textMuted,fontFamily:"monospace"}}>{(sf.weight*sf.elevation).toFixed(0)}</td>
-                <td style={{padding:"5px 8px",textAlign:"right",color:c.textMuted,fontFamily:"monospace"}}>{(sf.ratio*100).toFixed(1)}%</td>
-                <td style={{padding:"5px 8px",textAlign:"right",color,fontFamily:"monospace",fontWeight:700}}>{sf.Fi.toFixed(1)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr style={{background:c.elevated,borderTop:`2px solid ${c.border}`}}>
-              <td colSpan={5} style={{padding:"6px 8px",color:c.textSec,fontWeight:700,
-                fontSize:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>Total</td>
-              <td style={{padding:"6px 8px",textAlign:"right",color:c.red,
-                fontFamily:"monospace",fontWeight:700,fontSize:13}}>
-                {result.story_forces.reduce((a,s) => a+s.Fi,0).toFixed(1)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
     </div>
   )
 }

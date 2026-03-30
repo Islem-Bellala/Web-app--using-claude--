@@ -17,6 +17,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   accessToken:     null,
   refreshToken:    null,
   isAuthenticated: false,
+  isInitializing:  false,
   isLoading:       false,
   error:           null,
 
@@ -101,10 +102,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   async checkAuth() {
     const stored = localStorage.getItem(LS_ACCESS)
     if (!stored) {
-      set({ isLoading: false })
+      // No token — show LoginPage immediately, skip loading spinner
       return
     }
-    set({ isLoading: true })
+    set({ isInitializing: true })
 
     const AUTH_TIMEOUT_MS = 4000
     function withTimeout<T>(p: Promise<T>): Promise<T> {
@@ -119,12 +120,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const user = await withTimeout(apiGetMe(stored))
       const refresh = localStorage.getItem(LS_REFRESH)
+      useUIStore.getState().resetToProjects()
       set({
         user,
         accessToken:     stored,
         refreshToken:    refresh,
         isAuthenticated: true,
-        isLoading:       false,
+        isInitializing:  false,
       })
     } catch {
       // Token expired, network error, or timeout — try refresh
@@ -133,15 +135,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ refreshToken: refresh })
         try {
           const ok = await withTimeout(get().refreshTokens())
-          if (!ok) set({ isLoading: false })
+          if (ok) useUIStore.getState().resetToProjects()
+          // refreshTokens() handles auth state; always clear isInitializing
+          set({ isInitializing: false })
         } catch {
-          // Refresh timed out or failed — clear everything and show login
+          // Refresh timed out — clear everything and show login
           get().logout()
-          set({ isLoading: false })
+          set({ isInitializing: false })
         }
       } else {
         localStorage.removeItem(LS_ACCESS)
-        set({ isLoading: false })
+        set({ isInitializing: false })
       }
     }
   },
