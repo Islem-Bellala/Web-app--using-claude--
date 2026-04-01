@@ -1,5 +1,6 @@
 import SpectrumChart from '../seismic/SpectrumChart'
 import BaseShearPage from '../seismic/BaseShearPage'
+import CombinationsPage from '../seismic/CombinationsPage'
 import ProjectParams from '../general/ProjectParams'
 import ProjectList from '../general/ProjectList'
 import Topbar from './Topbar'
@@ -9,7 +10,7 @@ import { useProjectStore } from '../../stores/projectStore'
 import { getColors } from '../../theme'
 import type { AppColors } from '../../types'
 
-const PROJECT_REQUIRED = new Set(['params', 'spectrum', 'base_shear'])
+const PROJECT_REQUIRED = new Set(['params', 'spectrum', 'base_shear', 'combinations'])
 
 function ComingSoon({ c }: { c: AppColors }) {
   return (
@@ -36,11 +37,12 @@ export default function Layout() {
       return <ProjectList c={c} />
     }
     switch (activePage) {
-      case 'projects':   return <ProjectList   c={c} />
-      case 'params':     return <ProjectParams c={c} />
-      case 'spectrum':   return <SpectrumChart  c={c} isDark={isDark} />
-      case 'base_shear': return <BaseShearPage  c={c} />
-      default:           return <ComingSoon c={c} />
+      case 'projects':     return <ProjectList      c={c} />
+      case 'params':       return <ProjectParams    c={c} />
+      case 'spectrum':     return <SpectrumChart    c={c} isDark={isDark} />
+      case 'base_shear':   return <BaseShearPage    c={c} />
+      case 'combinations': return <CombinationsPage c={c} />
+      default:             return <ComingSoon c={c} />
     }
   }
 

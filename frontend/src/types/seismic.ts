@@ -79,3 +79,28 @@ export interface BaseShearResult {
   Ft: number;
   story_forces: StoryForce[];
 }
+
+// ── Combinations API ──────────────────────────────────────────────────────────
+
+export interface CombinationsRequest {
+  zone: string;
+  group: string;
+  psi: number;
+}
+
+export interface CombinationOut {
+  id: string;
+  label: string;
+  seismic_id: string;
+  ex_coeff: number;
+  ey_coeff: number;
+  ez_coeff: number;
+}
+
+export interface CombinationsResponse {
+  psi: number;
+  include_vertical: boolean;
+  av_i: number;
+  combinations: CombinationOut[];
+  total_count: number;
+}

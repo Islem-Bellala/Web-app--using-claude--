@@ -20,6 +20,8 @@ export interface ProjectState {
     engineer: string
     reference: string
     date: string
+    psiCase: number
+    psi: number
   }
   seismic: {
     twoDir: boolean

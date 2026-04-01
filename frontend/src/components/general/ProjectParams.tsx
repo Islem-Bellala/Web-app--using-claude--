@@ -326,6 +326,20 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
                 </select>
               </Field>
 
+              {/* ψ — Usage coefficient (Table 4.2 RPA 2024) */}
+              <Field label="Usage (ψ)" c={c}>
+                <select value={project.psiCase}
+                  onChange={e => project.setPsiCase(parseInt(e.target.value, 10))}
+                  title="Coefficient d'accompagnement ψ (Table 4.2 RPA 2024)"
+                  style={inputStyle}>
+                  <option value={1}>Habitation, bureaux (ψ = 0.30)</option>
+                  <option value={2}>Public temporaire — salles, restaurants… (ψ = 0.40)</option>
+                  <option value={3}>Entrepôts, hangars (ψ = 0.50)</option>
+                  <option value={4}>Archives, bibliothèques, réservoirs (ψ = 1.00)</option>
+                  <option value={5}>Autres locaux (ψ = 0.60)</option>
+                </select>
+              </Field>
+
               {/* Direction toggle */}
               <Field label="Directions d'analyse (spectre)" c={c}>
                 <div style={{display:"flex",gap:6}}>

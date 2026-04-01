@@ -9,9 +9,10 @@
  *   - λ correction applied: λ=0.85 if T0≤2T2 and n>2, else λ=1.0
  *   - 80% check: Vxd/Vyd vs 0.8×V — uses seismicStore.Vxd/Vyd
  *   - Coefficient de majoration shown when 80% check fails
+ *   - Auto-calculates on input changes (useEffect + 400ms debounce)
  */
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import type { AppColors, BaseShearResult } from "../../types"
 import { useProjectStore, useSeismicStore, useStructuralStore } from "../../stores"
 import { computeBaseShear } from "../../services/api"
@@ -152,6 +153,8 @@ export default function BaseShearPage({ c }: BaseShearPageProps) {
   const [loading,  setLoading] = useState<boolean>(false)
   const [apiErr,   setApiErr]  = useState<string | null>(null)
 
+  const abortRef = useRef<AbortController | null>(null)
+
   function storiesPayload() {
     return [...structural.stories]
       .map(s => ({name:s.name.trim(), elevation:parseFloat(s.elevation), weight:parseFloat(s.weight)}))
@@ -164,7 +167,9 @@ export default function BaseShearPage({ c }: BaseShearPageProps) {
     return sp.length >= 1 && parseFloat(structural.stories.map(s => s.elevation).filter(Boolean).slice(-1)[0]) > 0
   }
 
-  async function fetchDirection(QF: number, R: number, TCalc: string): Promise<BaseShearResult> {
+  async function fetchDirection(
+    QF: number, R: number, TCalc: string, signal: AbortSignal,
+  ): Promise<BaseShearResult> {
     const sp = storiesPayload()
     const hn = Math.max(...sp.map(s => s.elevation))
     return computeBaseShear({
@@ -176,39 +181,66 @@ export default function BaseShearPage({ c }: BaseShearPageProps) {
       hn,
       T_calculated:     TCalc ? parseFloat(TCalc) : null,
       stories:          sp,
-    })
+    }, signal)
   }
 
-  async function calculate() {
-    if (!isReady()) return
-    setLoading(true)
-    setApiErr(null)
-    try {
-      const [rX, rY] = await Promise.all([
-        fetchDirection(
-          seismic.twoDir ? seismic.QFx : seismic.QF,
-          seismic.twoDir ? seismic.Rx  : seismic.R,
-          seismic.Tx
-        ),
-        fetchDirection(
-          seismic.twoDir ? seismic.QFy : seismic.QF,
-          seismic.twoDir ? seismic.Ry  : seismic.R,
-          seismic.Ty
-        ),
-      ])
-      setResultX(rX)
-      setResultY(rY)
-    } catch (err) {
-      const error = err as Error
-      const msg = error.message.toLowerCase()
-      setApiErr(msg.includes("failed to fetch") || msg.includes("network")
-        ? "Backend non démarré — uvicorn backend.main:app --reload --port 8000"
-        : error.message
-      )
-    } finally {
-      setLoading(false)
+  // Auto-calculate on input changes (400ms debounce)
+  useEffect(() => {
+    if (!isReady()) {
+      setResultX(null)
+      setResultY(null)
+      return
     }
-  }
+
+    const timer = setTimeout(async () => {
+      abortRef.current?.abort()
+      const ctrl = new AbortController()
+      abortRef.current = ctrl
+
+      setLoading(true)
+      setApiErr(null)
+      try {
+        const [rX, rY] = await Promise.all([
+          fetchDirection(
+            seismic.twoDir ? seismic.QFx : seismic.QF,
+            seismic.twoDir ? seismic.Rx  : seismic.R,
+            seismic.Tx,
+            ctrl.signal,
+          ),
+          fetchDirection(
+            seismic.twoDir ? seismic.QFy : seismic.QF,
+            seismic.twoDir ? seismic.Ry  : seismic.R,
+            seismic.Ty,
+            ctrl.signal,
+          ),
+        ])
+        setResultX(rX)
+        setResultY(rY)
+      } catch (err) {
+        if ((err as { name?: string }).name === "AbortError") return
+        const error = err as Error
+        const msg = error.message.toLowerCase()
+        setApiErr(msg.includes("failed to fetch") || msg.includes("network")
+          ? "Backend non démarré — uvicorn backend.main:app --reload --port 8000"
+          : error.message
+        )
+      } finally {
+        setLoading(false)
+      }
+    }, 400)
+
+    return () => {
+      clearTimeout(timer)
+      abortRef.current?.abort()
+    }
+  }, [
+    project.zone, project.site, project.group,
+    seismic.frameSys, seismic.twoDir,
+    seismic.QF, seismic.R, seismic.QFx, seismic.Rx, seismic.QFy, seismic.Ry,
+    seismic.Tx, seismic.Ty,
+    // stories snapshot as a stable key
+    structural.stories.map(s => `${s.elevation}:${s.weight}`).join(","),
+  ])
 
   const totalW = structural.stories.reduce((a,s) => a+(parseFloat(s.weight)||0), 0)
 
@@ -271,15 +303,11 @@ export default function BaseShearPage({ c }: BaseShearPageProps) {
         </div>
       )}
 
-      {/* Calculate button */}
-      <button type="button" onClick={calculate}
-        disabled={loading || !isReady()}
-        style={{padding:"12px 28px",borderRadius:10,cursor:"pointer",
-          background:isReady() ? c.blue : c.border,
-          border:"none",color:"white",fontSize:14,fontWeight:700,
-          marginBottom:14,opacity:loading ? 0.7 : 1}}>
-        {loading ? "Calcul en cours..." : "⚡ Calculer V (X et Y)"}
-      </button>
+      {loading && (
+        <div style={{fontSize:13,color:c.textMuted,marginBottom:14,fontStyle:"italic"}}>
+          Calcul en cours…
+        </div>
+      )}
 
       {apiErr && (
         <div style={{background:c.red+"15",border:`1px solid ${c.red}44`,
@@ -306,7 +334,7 @@ export default function BaseShearPage({ c }: BaseShearPageProps) {
           justifyContent:"center",height:200,gap:12,color:c.textMuted}}>
           <div style={{fontSize:36}}>⚡</div>
           <div style={{fontSize:14,color:c.textSec}}>
-            Vérifier les paramètres dans Paramètres généraux, puis cliquer "Calculer"
+            Vérifier les paramètres dans Paramètres généraux
           </div>
         </div>
       )}

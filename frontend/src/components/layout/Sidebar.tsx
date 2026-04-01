@@ -4,7 +4,7 @@ import { useProjectStore } from '../../stores/projectStore'
 import { getColors } from '../../theme'
 
 // Pages that require an open project before they can be accessed
-const PROJECT_REQUIRED = new Set(['params', 'spectrum', 'base_shear'])
+const PROJECT_REQUIRED = new Set(['params', 'spectrum', 'base_shear', 'combinations'])
 
 interface NavItem { id: string; label: string; icon: string; ready: boolean }
 interface NavGroup { section: string; items: NavItem[] }
@@ -22,7 +22,7 @@ const NAV: NavGroup[] = [
     items: [
       { id:'spectrum',     label:'Spectre de réponse', icon:'📈', ready:true  },
       { id:'base_shear',   label:'Effort tranchant V', icon:'⚡', ready:true  },
-      { id:'combinations', label:'Combinaisons',        icon:'🔗', ready:false },
+      { id:'combinations', label:'Combinaisons',        icon:'🔗', ready:true  },
     ],
   },
   {

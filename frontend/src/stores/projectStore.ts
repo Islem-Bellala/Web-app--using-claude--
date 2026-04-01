@@ -19,6 +19,10 @@ interface ProjectStore {
   site: string;
   group: string;
 
+  // ψ — accompagnement coefficient (Table 4.2 RPA 2024)
+  psiCase: number;
+  psi: number;
+
   // Project metadata (displayed in params form)
   projectName: string;
   engineer: string;
@@ -43,6 +47,7 @@ interface ProjectStore {
   setZone: (zone: string) => void;
   setSite: (site: string) => void;
   setGroup: (group: string) => void;
+  setPsiCase: (psiCase: number) => void;
   setProjectMeta: (meta: Partial<Pick<ProjectStore, 'projectName' | 'engineer' | 'reference' | 'date'>>) => void;
   resetProject: () => void;
 
@@ -63,12 +68,23 @@ interface ProjectStore {
 
 const today = new Date().toISOString().split('T')[0];
 
+// ψ lookup — Table 4.2 RPA 2024
+const PSI_LOOKUP: Record<number, number> = {
+  1: 0.30,
+  2: 0.40,
+  3: 0.50,
+  4: 1.00,
+  5: 0.60,
+};
+
 const initialState = {
   wilayaCode: '09',
   commune: '',
   zone: 'VI',
   site: 'S2',
   group: '2',
+  psiCase: 1,
+  psi: 0.30,
   projectName: '',
   engineer: '',
   reference: '',
@@ -89,6 +105,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setZone: (zone) => set({ zone }),
   setSite: (site) => set({ site }),
   setGroup: (group) => set({ group }),
+  setPsiCase: (psiCase) => set({ psiCase, psi: PSI_LOOKUP[psiCase] ?? 0.30 }),
   setProjectMeta: (meta) => set((state) => ({ ...state, ...meta })),
   resetProject: () => set({
     ...initialState,
@@ -155,6 +172,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       zone:       s.zone,
       site:       s.site,
       group:      s.group,
+      psiCase:    s.psiCase,
+      psi:        s.psi,
       projectName: s.projectName,
       engineer:   s.engineer,
       reference:  s.reference,
@@ -163,12 +182,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   hydrateState: (state) => {
+    const psiCase = state.psiCase ?? 1;
     set({
       wilayaCode:  state.wilayaCode  ?? get().wilayaCode,
       commune:     state.commune     ?? '',
       zone:        state.zone        ?? '',
       site:        state.site        ?? get().site,
       group:       state.group       ?? get().group,
+      psiCase,
+      psi:         state.psi         ?? PSI_LOOKUP[psiCase] ?? 0.30,
       projectName: state.projectName ?? '',
       engineer:    state.engineer    ?? '',
       reference:   state.reference   ?? '',

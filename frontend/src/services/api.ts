@@ -11,6 +11,8 @@ import type {
   SpectrumApiResponse,
   BaseShearRequest,
   BaseShearResult,
+  CombinationsRequest,
+  CombinationsResponse,
   TokenResponse,
   User,
   ProjectSummary,
@@ -114,6 +116,17 @@ export async function computeBaseShear(
 ): Promise<BaseShearResult> {
   return request<BaseShearResult>(
     '/base_shear',
+    { method: 'POST', body: JSON.stringify(params) },
+    signal,
+  )
+}
+
+export async function computeCombinations(
+  params: CombinationsRequest,
+  signal?: AbortSignal,
+): Promise<CombinationsResponse> {
+  return request<CombinationsResponse>(
+    '/combinations',
     { method: 'POST', body: JSON.stringify(params) },
     signal,
   )
