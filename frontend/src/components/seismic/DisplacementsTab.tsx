@@ -160,8 +160,8 @@ export default function DisplacementsTab({ c, isDark: _isDark }: Props) {
         hk:        hk > 0 ? hk : elev,
         wg:        parseFloat(s.weight) || 0,
         wq:        0,
-        dek_x:     parseFloat(s.dek_x) || 0,
-        dek_y:     parseFloat(s.dek_y) || 0,
+        dek_x:     (parseFloat(s.dek_x) || 0) / 100,   // cm → m
+        dek_y:     (parseFloat(s.dek_y) || 0) / 100,   // cm → m
         elevation: elev,
       }
     })

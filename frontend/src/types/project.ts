@@ -63,16 +63,14 @@ export interface CommuneInfo {
   zone: string;
 }
 
-// Story as stored in state — elevation/weight/drx/dry are strings (form input values)
+// Story as stored in state — elevation/weight are strings (form input values)
 export interface Story {
   id: number;
   name: string;
   elevation: string;
   weight: string;
-  drx: string;
-  dry: string;
-  dek_x: string;  // elastic displacement X from Robot/ETABS (m)
-  dek_y: string;  // elastic displacement Y from Robot/ETABS (m)
+  dek_x: string;  // elastic displacement X from Robot/ETABS (cm, user input unit)
+  dek_y: string;  // elastic displacement Y from Robot/ETABS (cm, user input unit)
 }
 
 // Full global params object (DEFAULT_PARAMS shape from App.tsx)

@@ -1,703 +1,1191 @@
-/**
- * Bunyan — Paramètres Généraux (Phase 3)
- * Reads from Zustand stores — no more props drilling.
- *
- * Block 1 — Identification          (facultatif, auto-generated)
- * Block 2 — Paramètres sismiques    (wilaya -> zone, site, groupe, QF, R)
- * Block 3 — Géométrie et masses     (table des niveaux)
- * Block 4 — Résultats analyse dyn.  (Tx, Ty, Vxd, Vyd, déplacements)
- */
-
-import { useState, useEffect } from "react"
-import QFModal, { DEF_CHECKED } from "../shared/QFModal"
-import RModal, { type BracingSystem } from "../shared/RModal"
-import type { AppColors } from "../../types"
-import { useProjectStore, useSeismicStore, useStructuralStore } from "../../stores"
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import QFModal from '../shared/QFModal'
+import RModal, { type BracingSystem } from '../shared/RModal'
+import type { AppColors } from '../../types'
+import { useProjectStore, useSeismicStore, useStructuralStore } from '../../stores'
+import './ProjectParams.css'
 
 const ZONE_LABELS: Record<string, string> = {
-  "0":"Zone 0 — Très faible",
-  "I":"Zone I (0.07g)","II":"Zone II (0.10g)","III":"Zone III (0.15g)",
-  "IV":"Zone IV (0.20g)","V":"Zone V (0.25g)","VI":"Zone VI (0.30g)",
+  '0': 'Zone 0 - Tres faible',
+  I: 'Zone I (0.07g)',
+  II: 'Zone II (0.10g)',
+  III: 'Zone III (0.15g)',
+  IV: 'Zone IV (0.20g)',
+  V: 'Zone V (0.25g)',
+  VI: 'Zone VI (0.30g)',
 }
 
 interface FrameSystem {
-  v: string;
-  l: string;
-  ct: string;
+  v: string
+  l: string
+  ct: string
 }
 
 const FRAME_SYSTEMS: FrameSystem[] = [
-  {v:"ba_no_infill",   l:"Ossature BA sans remplissage",       ct:"CT=0.075"},
-  {v:"steel_no_infill",l:"Ossature acier sans remplissage",    ct:"CT=0.085"},
-  {v:"ba_with_infill", l:"Ossature BA/acier avec remplissage", ct:"CT=0.050"},
-  {v:"other",          l:"Autres systèmes",                    ct:"CT=0.050"},
+  { v: 'ba_no_infill', l: 'Ossature BA sans remplissage', ct: 'CT=0.075' },
+  { v: 'steel_no_infill', l: 'Ossature acier sans remplissage', ct: 'CT=0.085' },
+  { v: 'ba_with_infill', l: 'Ossature BA/acier avec remplissage', ct: 'CT=0.050' },
+  { v: 'other', l: 'Autres systemes', ct: 'CT=0.050' },
 ]
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SMALL REUSABLE COMPONENTS
-// ─────────────────────────────────────────────────────────────────────────────
+type ProjectStoreState = ReturnType<typeof useProjectStore>
+type SeismicStoreState = ReturnType<typeof useSeismicStore>
+type StructuralStoreState = ReturnType<typeof useStructuralStore>
+type StatusTone = 'complete' | 'attention' | 'optional'
 
-function BlockHeader({ title, color, c }: { title: string; color: string; c: AppColors }) {
-  return (
-    <div style={{fontSize:11,letterSpacing:"0.08em",fontWeight:700,
-      color:color,textTransform:"uppercase",marginBottom:12}}>
-      {title}
-    </div>
-  )
+interface ProjectParamsProps {
+  c: AppColors
 }
 
-function Field({ label, children, c }: { label: string; children: React.ReactNode; c: AppColors }) {
+function alpha(color: string, opacity: string) {
+  return `${color}${opacity}`
+}
+
+function joinClasses(...classes: Array<string | false | undefined>) {
+  return classes.filter(Boolean).join(' ')
+}
+
+function formatMetric(value: string | number, unit: string, digits = 2) {
+  if (value === '' || value === null || value === undefined) return '—'
+  const numeric = typeof value === 'number' ? value : parseFloat(value)
+  if (Number.isNaN(numeric)) return '—'
+  return `${numeric.toFixed(digits)} ${unit}`
+}
+
+function CardShell({
+  c,
+  title,
+  kicker,
+  description,
+  accent,
+  statusLabel,
+  statusTone,
+  className,
+  children,
+}: {
+  c: AppColors
+  title: string
+  kicker: string
+  description: string
+  accent: string
+  statusLabel: string
+  statusTone: StatusTone
+  className?: string
+  children: ReactNode
+}) {
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:10}}>
-      <label style={{fontSize:11,letterSpacing:"0.06em",color:c.textSec,
-        textTransform:"uppercase",fontWeight:600}}>{label}</label>
+    <section className={joinClasses('pp-card', className)}>
+      <div className="pp-card-header">
+        <div className="pp-card-heading">
+          <div className="pp-card-kicker" style={{ color: accent }}>
+            {kicker}
+          </div>
+          <h2 className="pp-card-title">{title}</h2>
+          <p className="pp-card-description">{description}</p>
+        </div>
+        <StatusBadge c={c} tone={statusTone}>
+          {statusLabel}
+        </StatusBadge>
+      </div>
       {children}
+    </section>
+  )
+}
+
+function StatusBadge({
+  c,
+  tone,
+  children,
+}: {
+  c: AppColors
+  tone: StatusTone
+  children: ReactNode
+}) {
+  const toneStyles =
+    tone === 'complete'
+      ? { color: c.green, border: alpha(c.green, '44'), background: alpha(c.green, '12') }
+      : tone === 'attention'
+        ? { color: c.amber, border: alpha(c.amber, '44'), background: alpha(c.amber, '12') }
+        : { color: c.textSec, border: c.border, background: c.elevated }
+
+  return (
+    <span
+      className="pp-status-badge"
+      style={{
+        color: toneStyles.color,
+        borderColor: toneStyles.border,
+        background: toneStyles.background,
+      }}
+    >
+      {children}
+    </span>
+  )
+}
+
+function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="pp-section-title-wrap">
+      <div className="pp-section-title">{title}</div>
+      {subtitle && <div className="pp-section-subtitle">{subtitle}</div>}
     </div>
   )
 }
 
-interface TextInputProps {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  c: AppColors;
-  style?: React.CSSProperties;
-}
-function TextInput({ value, onChange, placeholder, c, style = {} }: TextInputProps) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <input type="text" value={value} placeholder={placeholder}
-      onChange={e => onChange(e.target.value)}
-      style={{background:c.elevated,border:`1px solid ${c.border}`,
-        color:c.text,borderRadius:8,padding:"8px 10px",
-        fontSize:13,outline:"none",...style}}/>
+    <label className="pp-field">
+      <span className="pp-label">{label}</span>
+      {children}
+    </label>
   )
 }
 
-interface DirButtonProps {
-  label: string;
-  active: boolean;
-  color: string;
-  onClick: () => void;
-  c: AppColors;
-}
-function DirButton({ label, active, color, onClick, c }: DirButtonProps) {
+function TextInput({
+  value,
+  onChange,
+  placeholder,
+  style,
+}: {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  style?: CSSProperties
+}) {
   return (
-    <button type="button" onClick={onClick} style={{
-      flex:1,padding:"6px",borderRadius:8,cursor:"pointer",
-      border:`1px solid ${active ? color : c.border}`,
-      background:active ? color+"22" : c.elevated,
-      color:active ? color : c.textSec,
-      fontSize:12,fontWeight:active ? 700 : 400}}>
-      {label}
+    <input
+      type="text"
+      value={value}
+      placeholder={placeholder}
+      onChange={(event) => onChange(event.target.value)}
+      className="pp-input"
+      style={style}
+    />
+  )
+}
+
+function ChoiceButton({
+  active,
+  accent,
+  children,
+  onClick,
+}: {
+  active: boolean
+  accent: string
+  children: ReactNode
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={joinClasses('pp-choice-button', active && 'is-active')}
+      style={
+        {
+          '--pp-choice-accent': accent,
+          '--pp-choice-background': alpha(accent, '14'),
+        } as CSSProperties
+      }
+      onClick={onClick}
+    >
+      {children}
     </button>
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PROPS — only c (AppColors) needed now; all data comes from stores
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface ProjectParamsProps {
-  c: AppColors;
+function ActionTrigger({
+  accent,
+  title,
+  value,
+  helper,
+  action,
+}: {
+  accent: string
+  title: string
+  value: ReactNode
+  helper?: ReactNode
+  action: ReactNode
+}) {
+  return (
+    <div
+      className="pp-action-trigger"
+      style={
+        {
+          '--pp-trigger-accent': accent,
+          '--pp-trigger-background': alpha(accent, '12'),
+        } as CSSProperties
+      }
+    >
+      <div className="pp-action-copy">
+        <div className="pp-action-label">{title}</div>
+        <div className="pp-action-value">{value}</div>
+        {helper && <div className="pp-action-helper">{helper}</div>}
+      </div>
+      <div>{action}</div>
+    </div>
+  )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN COMPONENT
-// ─────────────────────────────────────────────────────────────────────────────
+function PageHeader() {
+  return (
+    <header className="pp-header">
+      <div>
+        <div className="pp-eyebrow">Bunyan - Parametres</div>
+        <h1 className="pp-page-title">Parametres generaux</h1>
+        <p className="pp-page-subtitle">
+          Point d&apos;entree unique pour les donnees de projet, les coefficients sismiques et les
+          resultats d&apos;analyse dynamique.
+        </p>
+      </div>
+      <div className="pp-header-note">
+        Ces valeurs alimentent le spectre, les combinaisons et la verification sismique.
+      </div>
+    </header>
+  )
+}
+
+function SummaryStrip({
+  c,
+  zoneLabel,
+  site,
+  group,
+  analysisMode,
+  storyCount,
+  totalW,
+  hn,
+}: {
+  c: AppColors
+  zoneLabel: string
+  site: string
+  group: string
+  analysisMode: string
+  storyCount: number
+  totalW: number
+  hn: number
+}) {
+  const items = [
+    { label: 'Zone', value: zoneLabel, helper: 'Classification RPA 2024', accent: c.blue },
+    { label: 'Site', value: site || '—', helper: 'Classe de site', accent: c.green },
+    { label: 'Groupe', value: group || '—', helper: 'Importance du projet', accent: c.amber },
+    { label: 'Mode', value: analysisMode, helper: 'Spectre de calcul', accent: c.purple },
+    { label: 'Niveaux', value: String(storyCount), helper: 'Niveaux modelises', accent: c.blue },
+    { label: 'W total', value: `${totalW.toFixed(0)} kN`, helper: 'Poids cumule', accent: c.green },
+    { label: 'h_n', value: `${hn.toFixed(1)} m`, helper: 'Hauteur totale', accent: c.purple },
+  ]
+
+  return (
+    <section className="pp-summary-strip">
+      {items.map((item) => (
+        <article
+          key={item.label}
+          className="pp-summary-card"
+          style={{ borderTopColor: item.accent }}
+        >
+          <div className="pp-summary-label">{item.label}</div>
+          <div className="pp-summary-value">{item.value}</div>
+          <div className="pp-summary-helper">{item.helper}</div>
+        </article>
+      ))}
+    </section>
+  )
+}
+
+function IdentificationCard({
+  c,
+  project,
+  completedCount,
+}: {
+  c: AppColors
+  project: ProjectStoreState
+  completedCount: number
+}) {
+  const statusLabel = completedCount > 0 ? `${completedCount}/3 renseignes` : 'Facultatif'
+  const statusTone: StatusTone = completedCount > 0 ? 'complete' : 'optional'
+
+  return (
+    <CardShell
+      c={c}
+      title="Identification"
+      kicker="1 - Informations projet"
+      description="Bloc secondaire. Les champs vides restent utilisables grace aux valeurs generees automatiquement."
+      accent={c.textMuted}
+      statusLabel={statusLabel}
+      statusTone={statusTone}
+      className="pp-identification-card"
+    >
+      <div className="pp-note pp-note--neutral">
+        Nom du projet, ingenieur et reference sont optionnels. La date reste affichee telle quelle.
+      </div>
+
+      <div className="pp-card-stack">
+        <Field label="Nom du projet">
+          <TextInput
+            value={project.projectName}
+            onChange={(value) => project.setProjectMeta({ projectName: value })}
+            placeholder={`Projet_${project.date}`}
+          />
+        </Field>
+        <Field label="Ingenieur">
+          <TextInput
+            value={project.engineer}
+            onChange={(value) => project.setProjectMeta({ engineer: value })}
+            placeholder="Nom de l'ingenieur"
+          />
+        </Field>
+        <Field label="Reference">
+          <TextInput
+            value={project.reference}
+            onChange={(value) => project.setProjectMeta({ reference: value })}
+            placeholder="Ref. dossier"
+          />
+        </Field>
+        <Field label="Date">
+          <div className="pp-static-value">{project.date}</div>
+        </Field>
+      </div>
+    </CardShell>
+  )
+}
+
+function SeismicCard({
+  c,
+  project,
+  seismic,
+  wilayaName,
+  wilayaHasSplitZones,
+  hasCommunes,
+  seismicReady,
+  hasPlanGeometry,
+  onOpenQF,
+  onOpenR,
+}: {
+  c: AppColors
+  project: ProjectStoreState
+  seismic: SeismicStoreState
+  wilayaName: string
+  wilayaHasSplitZones: boolean
+  hasCommunes: boolean
+  seismicReady: boolean
+  hasPlanGeometry: boolean
+  onOpenQF: (mode: string) => void
+  onOpenR: (mode: string) => void
+}) {
+  return (
+    <CardShell
+      c={c}
+      title="Parametres sismiques"
+      kicker="2 - Pilotage RPA 2024"
+      description="Zone, classification, coefficients de comportement et geometrie en plan regroupes dans un bloc principal."
+      accent={c.blue}
+      statusLabel={seismicReady ? 'Complet' : 'A verifier'}
+      statusTone={seismicReady ? 'complete' : 'attention'}
+      className="pp-seismic-card"
+    >
+      <div className="pp-card-section pp-card-section--first">
+        <SectionTitle title="Localite" subtitle="Wilaya, commune et zone sismique derivee." />
+        <div className="pp-field-grid pp-field-grid--two">
+          <Field label="Wilaya">
+            <select
+              value={project.wilayaCode}
+              onChange={(event) => project.setWilaya(event.target.value)}
+              disabled={project.wilayasLoading}
+              className="pp-input pp-select"
+            >
+              {project.wilayas.map((wilaya) => (
+                <option key={wilaya.code} value={wilaya.code}>
+                  {wilaya.code} - {wilaya.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          {wilayaHasSplitZones && hasCommunes ? (
+            <Field label="Commune">
+              <select
+                value={project.commune}
+                onChange={(event) => project.setCommune(event.target.value)}
+                disabled={project.communesLoading}
+                className="pp-input pp-select"
+                style={{ borderColor: alpha(c.amber, '66') }}
+              >
+                <option value="">- Autre commune (Zone {project.zone || '—'})</option>
+                {[...project.communes]
+                  .sort((a, b) => a.zone.localeCompare(b.zone) || a.name.localeCompare(b.name))
+                  .map((commune) => (
+                    <option key={commune.name} value={commune.name}>
+                      {commune.name} - Zone {commune.zone}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+          ) : (
+            <Field label="Commune">
+              <div className="pp-static-value">{project.commune || 'Non applicable'}</div>
+            </Field>
+          )}
+        </div>
+
+        <div className="pp-highlight-card" style={{ borderColor: alpha(c.blue, '44') }}>
+          <div className="pp-highlight-row">
+            <div>
+              <div className="pp-highlight-label">Wilaya active</div>
+              <div className="pp-highlight-value">{wilayaName}</div>
+            </div>
+            <div>
+              <div className="pp-highlight-label">Zone sismique</div>
+              <div className="pp-highlight-value" style={{ color: project.zone === '0' ? c.amber : c.blue }}>
+                {ZONE_LABELS[project.zone] || project.zone || 'En attente'}
+              </div>
+            </div>
+          </div>
+          {wilayaHasSplitZones && !hasCommunes && !project.communesLoading && (
+            <div className="pp-inline-note" style={{ color: c.amber }}>
+              Wilaya partagee - consulter l&apos;Annexe A du RPA 2024 pour confirmer la commune.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="pp-card-section">
+        <SectionTitle title="Classification" subtitle="Parametres de site, d&apos;usage et de structure." />
+        <div className="pp-field-grid pp-field-grid--two">
+          <Field label="Classe de site">
+            <div className="pp-button-row pp-button-row--four">
+              {['S1', 'S2', 'S3', 'S4'].map((site) => (
+                <ChoiceButton
+                  key={site}
+                  active={project.site === site}
+                  accent={c.green}
+                  onClick={() => project.setSite(site)}
+                >
+                  {site}
+                </ChoiceButton>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="Groupe d'importance">
+            <select
+              value={project.group}
+              onChange={(event) => project.setGroup(event.target.value)}
+              className="pp-input pp-select"
+            >
+              <option value="1A">Groupe 1A - I=1.4</option>
+              <option value="1B">Groupe 1B - I=1.2</option>
+              <option value="2">Groupe 2 - I=1.0</option>
+              <option value="3">Groupe 3 - I=0.8</option>
+            </select>
+          </Field>
+
+          <Field label="Usage (ψ)">
+            <select
+              value={project.psiCase}
+              onChange={(event) => project.setPsiCase(parseInt(event.target.value, 10))}
+              className="pp-input pp-select"
+            >
+              <option value={1}>Habitation, bureaux (ψ = 0.30)</option>
+              <option value={2}>Public temporaire - salles, restaurants... (ψ = 0.40)</option>
+              <option value={3}>Entrepots, hangars (ψ = 0.50)</option>
+              <option value={4}>Archives, bibliotheques, reservoirs (ψ = 1.00)</option>
+              <option value={5}>Autres locaux (ψ = 0.60)</option>
+            </select>
+          </Field>
+
+          <Field label="Type de structure">
+            <select
+              value={project.structureType}
+              onChange={(event) => project.setStructureType(event.target.value)}
+              className="pp-input pp-select"
+            >
+              <option value="acier">Acier</option>
+              <option value="beton_arme">Beton arme</option>
+              <option value="paf">PAF</option>
+              <option value="bois">Bois</option>
+              <option value="maconnerie">Maconnerie chainee</option>
+            </select>
+          </Field>
+
+          <Field label="Elements non structuraux">
+            <select
+              value={project.nonStructuralType}
+              onChange={(event) => project.setNonStructuralType(event.target.value)}
+              className="pp-input pp-select"
+            >
+              <option value="fragile">Fragiles</option>
+              <option value="ductile">Ductiles</option>
+            </select>
+          </Field>
+        </div>
+      </div>
+
+      <div className="pp-card-section">
+        <SectionTitle title="Coefficients et directions" subtitle="Mode d'analyse, facteur QF, coefficient R et systeme CT." />
+        <div className="pp-card-stack">
+          <Field label="Directions d'analyse (spectre)">
+            <div className="pp-button-row pp-button-row--two">
+              <ChoiceButton
+                active={!seismic.twoDir}
+                accent={c.blue}
+                onClick={() => seismic.setTwoDir(false)}
+              >
+                Direction unique
+              </ChoiceButton>
+              <ChoiceButton
+                active={seismic.twoDir}
+                accent={c.purple}
+                onClick={() => seismic.setTwoDir(true)}
+              >
+                X et Y separees
+              </ChoiceButton>
+            </div>
+          </Field>
+
+          {!seismic.twoDir ? (
+            <div className="pp-field-grid pp-field-grid--two">
+              <ActionTrigger
+                accent={c.amber}
+                title="Facteur qualite QF"
+                value={
+                  <>
+                    Q<sub>F</sub> = <strong>{seismic.QF.toFixed(2)}</strong>
+                  </>
+                }
+                helper="Calcul du facteur de qualite"
+                action={
+                  <button type="button" className="pp-link-button" onClick={() => onOpenQF('single')}>
+                    Calculer
+                  </button>
+                }
+              />
+
+              <ActionTrigger
+                accent={c.red}
+                title="Coefficient de comportement R"
+                value={
+                  <>
+                    R = <strong>{seismic.R}</strong>
+                  </>
+                }
+                helper={
+                  <>
+                    Systeme {seismic.selSys} - Cat. Q<sub>F</sub> ({seismic.qfCat})
+                  </>
+                }
+                action={
+                  <button type="button" className="pp-link-button" onClick={() => onOpenR('single')}>
+                    Identifier
+                  </button>
+                }
+              />
+            </div>
+          ) : (
+            <div className="pp-direction-grid">
+              <div className="pp-direction-card" style={{ borderColor: alpha(c.blue, '44') }}>
+                <div className="pp-direction-title" style={{ color: c.blue }}>
+                  Direction X
+                </div>
+                <div className="pp-card-stack">
+                  <ActionTrigger
+                    accent={c.amber}
+                    title="Facteur qualite"
+                    value={
+                      <>
+                        Q<sub>Fx</sub> = <strong>{seismic.QFx.toFixed(2)}</strong>
+                      </>
+                    }
+                    action={
+                      <button type="button" className="pp-link-button" onClick={() => onOpenQF('x')}>
+                        Calculer
+                      </button>
+                    }
+                  />
+                  <ActionTrigger
+                    accent={c.red}
+                    title="Coefficient R"
+                    value={
+                      <>
+                        R<sub>x</sub> = <strong>{seismic.Rx}</strong>
+                      </>
+                    }
+                    helper={
+                      <>
+                        Systeme {seismic.selSysX} - Cat. Q<sub>F</sub> ({seismic.qfCatX})
+                      </>
+                    }
+                    action={
+                      <button type="button" className="pp-link-button" onClick={() => onOpenR('x')}>
+                        Identifier
+                      </button>
+                    }
+                  />
+                </div>
+              </div>
+              <div className="pp-direction-card" style={{ borderColor: alpha(c.purple, '44') }}>
+                <div className="pp-direction-title" style={{ color: c.purple }}>
+                  Direction Y
+                </div>
+                <div className="pp-card-stack">
+                  <ActionTrigger
+                    accent={c.amber}
+                    title="Facteur qualite"
+                    value={
+                      <>
+                        Q<sub>Fy</sub> = <strong>{seismic.QFy.toFixed(2)}</strong>
+                      </>
+                    }
+                    action={
+                      <button type="button" className="pp-link-button" onClick={() => onOpenQF('y')}>
+                        Calculer
+                      </button>
+                    }
+                  />
+                  <ActionTrigger
+                    accent={c.red}
+                    title="Coefficient R"
+                    value={
+                      <>
+                        R<sub>y</sub> = <strong>{seismic.Ry}</strong>
+                      </>
+                    }
+                    helper={
+                      <>
+                        Systeme {seismic.selSysY} - Cat. Q<sub>F</sub> ({seismic.qfCatY})
+                      </>
+                    }
+                    action={
+                      <button type="button" className="pp-link-button" onClick={() => onOpenR('y')}>
+                        Identifier
+                      </button>
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <Field label="Systeme pour periode T (CT)">
+            <select
+              value={seismic.frameSys}
+              onChange={(event) => seismic.setField('frameSys', event.target.value)}
+              className="pp-input pp-select"
+            >
+              {FRAME_SYSTEMS.map((frame) => (
+                <option key={frame.v} value={frame.v}>
+                  {frame.ct} - {frame.l}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </div>
+
+      <div className="pp-card-section">
+        <SectionTitle title="Geometrie en plan" subtitle="Dimensions en plan et coefficient de frottement." />
+        <div className="pp-field-grid pp-field-grid--three">
+          <Field label="Lx (m)">
+            <input
+              type="number"
+              value={project.lx || ''}
+              min={0}
+              step={0.5}
+              onChange={(event) => project.setLx(parseFloat(event.target.value) || 0)}
+              placeholder="0"
+              className="pp-input pp-input--numeric"
+            />
+          </Field>
+          <Field label="Ly (m)">
+            <input
+              type="number"
+              value={project.ly || ''}
+              min={0}
+              step={0.5}
+              onChange={(event) => project.setLy(parseFloat(event.target.value) || 0)}
+              placeholder="0"
+              className="pp-input pp-input--numeric"
+            />
+          </Field>
+          <Field label="μ (frottement)">
+            <input
+              type="number"
+              value={project.mu}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(event) => project.setMu(parseFloat(event.target.value) || 0.4)}
+              placeholder="0.40"
+              className="pp-input pp-input--numeric"
+            />
+          </Field>
+        </div>
+
+        <div className={joinClasses('pp-inline-status', hasPlanGeometry ? 'is-complete' : 'is-attention')}>
+          {hasPlanGeometry
+            ? 'Lx et Ly sont renseignes pour les controles de renversement et de glissement.'
+            : 'Renseigner Lx et Ly pour completer les verifications de renversement et de glissement.'}
+        </div>
+      </div>
+    </CardShell>
+  )
+}
+
+function GeometryMassesCard({
+  c,
+  project,
+  structural,
+  totalW,
+  hn,
+  storyCount,
+  filledStoryCount,
+  geometryReady,
+}: {
+  c: AppColors
+  project: ProjectStoreState
+  structural: StructuralStoreState
+  totalW: number
+  hn: number
+  storyCount: number
+  filledStoryCount: number
+  geometryReady: boolean
+}) {
+  return (
+    <CardShell
+      c={c}
+      title="Geometrie et masses"
+      kicker="3 - Niveaux"
+      description="Table de niveaux, hauteurs et poids utilises dans les verifications sismiques."
+      accent={c.green}
+      statusLabel={geometryReady ? 'Complet' : `${filledStoryCount}/${storyCount} lignes completes`}
+      statusTone={geometryReady ? 'complete' : 'attention'}
+      className="pp-geometry-card"
+    >
+      <div className="pp-note pp-note--neutral">
+        Les valeurs de hauteur et de poids sont lues directement par les modules de calcul.
+      </div>
+
+      <div className="pp-table-shell pp-table-shell--stories">
+        <div
+          className="pp-table-header"
+          style={{ gridTemplateColumns: 'minmax(160px, 1.5fr) 92px 110px 40px' }}
+        >
+          <div>Niveau</div>
+          <div>h (m)</div>
+          <div>W (kN)</div>
+          <div />
+        </div>
+        <div className="pp-table-scroll">
+          {structural.stories.map((story) => (
+            <div
+              key={story.id}
+              className="pp-table-row"
+              style={{ gridTemplateColumns: 'minmax(160px, 1.5fr) 92px 110px 40px' }}
+            >
+              <input
+                value={story.name}
+                placeholder="Niveau"
+                onChange={(event) => structural.updateStory(story.id, 'name', event.target.value)}
+                className="pp-input"
+              />
+              <input
+                type="number"
+                value={story.elevation}
+                min={0}
+                step={0.5}
+                onChange={(event) => structural.updateStory(story.id, 'elevation', event.target.value)}
+                className="pp-input pp-input--numeric"
+              />
+              <input
+                type="number"
+                value={story.weight}
+                min={0}
+                onChange={(event) => structural.updateStory(story.id, 'weight', event.target.value)}
+                className="pp-input pp-input--numeric"
+                style={{ color: c.green }}
+              />
+              <button
+                type="button"
+                onClick={() => structural.removeStory(story.id)}
+                disabled={structural.stories.length <= 1}
+                className="pp-icon-button"
+                aria-label={`Supprimer ${story.name}`}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="pp-actions-row">
+        <button type="button" onClick={() => structural.addStory()} className="pp-primary-button">
+          + Ajouter un niveau
+        </button>
+        <div className="pp-inline-note" style={{ color: c.textMuted }}>
+          {project.lx > 0 || project.ly > 0
+            ? `Plan saisi: ${project.lx || 0} m x ${project.ly || 0} m`
+            : 'Plan non saisi'}
+        </div>
+      </div>
+
+      <div className="pp-totals-grid">
+        <div className="pp-total-card">
+          <div className="pp-total-label">Poids total W</div>
+          <div className="pp-total-value" style={{ color: c.green }}>
+            {totalW.toFixed(0)} kN
+          </div>
+        </div>
+        <div className="pp-total-card">
+          <div className="pp-total-label">Hauteur totale h_n</div>
+          <div className="pp-total-value" style={{ color: c.purple }}>
+            {hn.toFixed(1)} m
+          </div>
+        </div>
+      </div>
+    </CardShell>
+  )
+}
+
+function MetricInputCard({
+  accent,
+  label,
+  value,
+  display,
+  onChange,
+}: {
+  accent: string
+  label: string
+  value: string
+  display: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div
+      className="pp-metric-card"
+      style={
+        {
+          '--pp-metric-accent': accent,
+          '--pp-metric-background': alpha(accent, '10'),
+        } as CSSProperties
+      }
+    >
+      <div className="pp-metric-label">{label}</div>
+      <div className="pp-metric-display" style={{ color: accent }}>
+        {display}
+      </div>
+      <input
+        type="number"
+        min={0}
+        step="0.01"
+        value={value}
+        placeholder="—"
+        onChange={(event) => onChange(event.target.value)}
+        className="pp-input pp-input--numeric"
+      />
+    </div>
+  )
+}
+
+function DynamicResultsCard({
+  c,
+  seismic,
+  structural,
+  dynamicReady,
+  missingDynamic,
+}: {
+  c: AppColors
+  seismic: SeismicStoreState
+  structural: StructuralStoreState
+  dynamicReady: boolean
+  missingDynamic: string[]
+}) {
+  const metrics = [
+    {
+      label: 'Periode Tx (s)',
+      value: seismic.Tx,
+      display: formatMetric(seismic.Tx, 's', 2),
+      accent: c.blue,
+      onChange: (next: string) => seismic.setField('Tx', next),
+    },
+    {
+      label: 'Periode Ty (s)',
+      value: seismic.Ty,
+      display: formatMetric(seismic.Ty, 's', 2),
+      accent: c.purple,
+      onChange: (next: string) => seismic.setField('Ty', next),
+    },
+    {
+      label: 'Effort dyn. Vxd (kN)',
+      value: seismic.Vxd,
+      display: formatMetric(seismic.Vxd, 'kN', 0),
+      accent: c.blue,
+      onChange: (next: string) => seismic.setField('Vxd', next),
+    },
+    {
+      label: 'Effort dyn. Vyd (kN)',
+      value: seismic.Vyd,
+      display: formatMetric(seismic.Vyd, 'kN', 0),
+      accent: c.purple,
+      onChange: (next: string) => seismic.setField('Vyd', next),
+    },
+  ]
+
+  return (
+    <CardShell
+      c={c}
+      title="Resultats analyse dynamique"
+      kicker="4 - Saisie etat modal"
+      description="Periodes, efforts dynamiques et deplacements elastiques importes ou saisis manuellement."
+      accent={c.amber}
+      statusLabel={dynamicReady ? 'Pret pour verification' : 'Saisie partielle'}
+      statusTone={dynamicReady ? 'complete' : 'attention'}
+      className="pp-results-card"
+    >
+      <div className="pp-import-banner">
+        <div className="pp-import-dot" />
+        <span className="pp-import-copy">Robot / ETABS non connecte - saisie manuelle</span>
+        <button type="button" className="pp-disabled-button" disabled>
+          Importer
+        </button>
+      </div>
+
+      <div className={joinClasses('pp-note', dynamicReady ? 'pp-note--positive' : 'pp-note--warning')}>
+        {dynamicReady
+          ? 'Les periodes, efforts et deplacements requis sont renseignes pour la verification en cours.'
+          : `A completer: ${missingDynamic.join(', ')}.`}
+      </div>
+
+      <div className="pp-results-body">
+        <div className="pp-results-left">
+          <SectionTitle title="Metriques principales" subtitle="Valeurs saisies en entree d'analyse dynamique." />
+          <div className="pp-metrics-grid">
+            {metrics.map((metric) => (
+              <MetricInputCard
+                key={metric.label}
+                accent={metric.accent}
+                label={metric.label}
+                value={metric.value}
+                display={metric.display}
+                onChange={metric.onChange}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="pp-results-right">
+          <SectionTitle
+            title="Deplacements elastiques δek (cm)"
+            subtitle="Une ligne par niveau, avec alignement numerique et en-tete fixe."
+          />
+          <div className="pp-table-shell pp-table-shell--displacements">
+            <div
+              className="pp-table-header"
+              style={{ gridTemplateColumns: 'minmax(160px, 1.4fr) 120px 120px' }}
+            >
+              <div>Niveau</div>
+              <div>δek,x (cm)</div>
+              <div>δek,y (cm)</div>
+            </div>
+            <div className="pp-table-scroll pp-table-scroll--tall">
+              {structural.stories.map((story) => (
+                <div
+                  key={story.id}
+                  className="pp-table-row"
+                  style={{ gridTemplateColumns: 'minmax(160px, 1.4fr) 120px 120px' }}
+                >
+                  <div className="pp-row-title">{story.name}</div>
+                  <input
+                    type="number"
+                    value={story.dek_x || ''}
+                    min={0}
+                    step="0.01"
+                    placeholder="—"
+                    onChange={(event) => structural.updateStory(story.id, 'dek_x', event.target.value)}
+                    className="pp-input pp-input--numeric"
+                    style={{ color: c.blue }}
+                  />
+                  <input
+                    type="number"
+                    value={story.dek_y || ''}
+                    min={0}
+                    step="0.01"
+                    placeholder="—"
+                    onChange={(event) => structural.updateStory(story.id, 'dek_y', event.target.value)}
+                    className="pp-input pp-input--numeric"
+                    style={{ color: c.purple }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </CardShell>
+  )
+}
 
 export default function ProjectParams({ c }: ProjectParamsProps) {
-  // Stores
-  const project    = useProjectStore()
-  const seismic    = useSeismicStore()
+  const project = useProjectStore()
+  const seismic = useSeismicStore()
   const structural = useStructuralStore()
 
-  // Modal visibility — null | "single" | "x" | "y"
   const [showQF, setShowQF] = useState<string | null>(null)
-  const [showR,  setShowR]  = useState<string | null>(null)
+  const [showR, setShowR] = useState<string | null>(null)
 
-  // Fetch wilayas on mount if not already loaded
   useEffect(() => {
     if (project.wilayas.length === 0) {
       project.fetchWilayas()
     }
   }, [])
 
-  // Current wilaya info from store
-  const wilaya = project.wilayas.find(w => w.code === project.wilayaCode)
+  const wilaya = project.wilayas.find((entry) => entry.code === project.wilayaCode)
   const hasCommunes = project.communes.length > 0
 
-  // QF modal helpers
   function handleQFValidate(qf: number, cat: string, chk: Record<string, boolean>) {
-    if (showQF === "x")      seismic.setQFParams({ QFx: qf, qfCatX: cat, qfChkX: chk })
-    else if (showQF === "y") seismic.setQFParams({ QFy: qf, qfCatY: cat, qfChkY: chk })
-    else                     seismic.setQFParams({ QF: qf, qfCat: cat, qfChk: chk })
+    if (showQF === 'x') {
+      seismic.setQFParams({ QFx: qf, qfCatX: cat, qfChkX: chk })
+    } else if (showQF === 'y') {
+      seismic.setQFParams({ QFy: qf, qfCatY: cat, qfChkY: chk })
+    } else {
+      seismic.setQFParams({ QF: qf, qfCat: cat, qfChk: chk })
+    }
     setShowQF(null)
   }
 
-  // R modal helpers
-  function handleRValidate(r: number | undefined, sys: BracingSystem | null | undefined) {
-    if (showR === "x") {
-      seismic.setRParams({ Rx: r ?? seismic.Rx, selSysX: sys?.id ?? 1 })
-      seismic.setField('qfCatX', sys?.qfCat ?? 'a')
-    } else if (showR === "y") {
-      seismic.setRParams({ Ry: r ?? seismic.Ry, selSysY: sys?.id ?? 1 })
-      seismic.setField('qfCatY', sys?.qfCat ?? 'a')
+  function handleRValidate(r: number | undefined, system: BracingSystem | null | undefined) {
+    if (showR === 'x') {
+      seismic.setRParams({ Rx: r ?? seismic.Rx, selSysX: system?.id ?? 1 })
+      seismic.setField('qfCatX', system?.qfCat ?? 'a')
+    } else if (showR === 'y') {
+      seismic.setRParams({ Ry: r ?? seismic.Ry, selSysY: system?.id ?? 1 })
+      seismic.setField('qfCatY', system?.qfCat ?? 'a')
     } else {
-      seismic.setRParams({ R: r ?? seismic.R, selSys: sys?.id ?? 1 })
-      seismic.setField('qfCat', sys?.qfCat ?? 'a')
+      seismic.setRParams({ R: r ?? seismic.R, selSys: system?.id ?? 1 })
+      seismic.setField('qfCat', system?.qfCat ?? 'a')
     }
     setShowR(null)
   }
 
-  const isZone0 = project.zone === "0"
-  const totalW  = structural.stories.reduce((a, s) => a + (parseFloat(s.weight) || 0), 0)
-  const hn      = structural.stories.length
-    ? Math.max(...structural.stories.map(s => parseFloat(s.elevation) || 0))
+  const totalW = structural.stories.reduce((acc, story) => acc + (parseFloat(story.weight) || 0), 0)
+  const hn = structural.stories.length
+    ? Math.max(...structural.stories.map((story) => parseFloat(story.elevation) || 0))
     : 0
+  const storyCount = structural.stories.length
+  const filledStoryCount = structural.stories.filter(
+    (story) => story.name.trim() && story.elevation !== '' && story.weight !== '',
+  ).length
+  const identificationCount = [project.projectName, project.engineer, project.reference].filter(
+    (value) => value.trim() !== '',
+  ).length
+  const hasPlanGeometry = project.lx > 0 && project.ly > 0
+  const seismicReady =
+    Boolean(project.wilayaCode && project.zone && project.site && project.group && seismic.frameSys) &&
+    (!seismic.twoDir
+      ? seismic.QF > 0 && seismic.R > 0
+      : seismic.QFx > 0 && seismic.QFy > 0 && seismic.Rx > 0 && seismic.Ry > 0)
+  const geometryReady = filledStoryCount === storyCount && storyCount > 0 && hasPlanGeometry
+  const missingDekX = structural.stories.filter((story) => !story.dek_x).length
+  const missingDekY = structural.stories.filter((story) => !story.dek_y).length
+  const missingDynamic: string[] = []
 
-  const inputStyle: React.CSSProperties = {background:c.elevated,border:`1px solid ${c.border}`,
-    color:c.text,borderRadius:8,padding:"8px 10px",fontSize:13,outline:"none",width:"100%"}
-
-  // Card style shared by all columns
-  const cardStyle: React.CSSProperties = {
-    background: c.surface, border: `1px solid ${c.border}`,
-    borderRadius: 14, padding: 16,
-    height: '100%', overflowY: 'auto', boxSizing: 'border-box',
+  if (!seismic.Tx) missingDynamic.push('Tx')
+  if (!seismic.Vxd) missingDynamic.push('Vxd')
+  if (seismic.twoDir && !seismic.Ty) missingDynamic.push('Ty')
+  if (seismic.twoDir && !seismic.Vyd) missingDynamic.push('Vyd')
+  if (missingDekX > 0) missingDynamic.push(`δek,x (${missingDekX} niveau${missingDekX > 1 ? 'x' : ''})`)
+  if (seismic.twoDir && missingDekY > 0) {
+    missingDynamic.push(`δek,y (${missingDekY} niveau${missingDekY > 1 ? 'x' : ''})`)
   }
 
+  const dynamicReady = missingDynamic.length === 0
+  const zoneLabel = ZONE_LABELS[project.zone] || project.zone || 'En attente'
+  const analysisMode = seismic.twoDir ? 'X et Y separees' : 'Direction unique'
+
+  const pageVars = {
+    '--pp-bg': c.bg,
+    '--pp-bg-soft': alpha(c.elevated, '99'),
+    '--pp-surface': c.surface,
+    '--pp-surface-alt': alpha(c.surface, 'f5'),
+    '--pp-elevated': c.elevated,
+    '--pp-border': c.border,
+    '--pp-border-strong': c.borderLight,
+    '--pp-text': c.text,
+    '--pp-text-sec': c.textSec,
+    '--pp-text-muted': c.textMuted,
+    '--pp-blue': c.blue,
+    '--pp-green': c.green,
+    '--pp-amber': c.amber,
+    '--pp-red': c.red,
+    '--pp-purple': c.purple,
+    '--pp-focus': c.blue,
+    '--pp-focus-ring': alpha(c.blue, '22'),
+  } as CSSProperties
+
   return (
-    <div style={{
-      height: '100%', display: 'flex', flexDirection: 'column',
-      background: c.bg, overflow: 'hidden',
-      fontFamily: "'IBM Plex Sans','Segoe UI',sans-serif",
-      transition: 'background 0.2s',
-    }}>
-
-      {/* QF Modals */}
+    <div className="project-params-page" style={pageVars}>
       {showQF && (
-        <QFModal c={c}
-          initCat={showQF==="x" ? seismic.qfCatX : showQF==="y" ? seismic.qfCatY : seismic.qfCat}
-          initChecked={showQF==="x" ? seismic.qfChkX : showQF==="y" ? seismic.qfChkY : seismic.qfChk}
+        <QFModal
+          c={c}
+          initCat={showQF === 'x' ? seismic.qfCatX : showQF === 'y' ? seismic.qfCatY : seismic.qfCat}
+          initChecked={
+            showQF === 'x' ? seismic.qfChkX : showQF === 'y' ? seismic.qfChkY : seismic.qfChk
+          }
           onClose={() => setShowQF(null)}
-          onValidate={handleQFValidate}/>
+          onValidate={handleQFValidate}
+        />
       )}
 
-      {/* R Modals */}
       {showR && (
-        <RModal c={c}
-          initSystem={showR==="x" ? seismic.selSysX : showR==="y" ? seismic.selSysY : seismic.selSys}
+        <RModal
+          c={c}
+          initSystem={showR === 'x' ? seismic.selSysX : showR === 'y' ? seismic.selSysY : seismic.selSys}
           onClose={() => setShowR(null)}
-          onValidate={handleRValidate}/>
+          onValidate={handleRValidate}
+        />
       )}
 
-      {/* ── Page header ─────────────────────────────────────────────────────── */}
-      <div style={{ padding: '16px 16px 12px', flexShrink: 0 }}>
-        <div style={{fontSize:12,letterSpacing:"0.12em",color:c.blue,
-          textTransform:"uppercase",marginBottom:4,fontWeight:600}}>
-          BUNYAN — PARAMÈTRES
-        </div>
-        <h1 style={{fontSize:20,fontWeight:700,margin:0,color:c.text}}>
-          Paramètres Généraux
-        </h1>
-        <div style={{color:c.textSec,fontSize:12,marginTop:2}}>
-          Définis une fois — utilisés par tous les modules de vérification
-        </div>
+      <PageHeader />
+
+      <SummaryStrip
+        c={c}
+        zoneLabel={zoneLabel}
+        site={project.site}
+        group={project.group}
+        analysisMode={analysisMode}
+        storyCount={storyCount}
+        totalW={totalW}
+        hn={hn}
+      />
+
+      <div className="pp-dashboard-row">
+        <IdentificationCard c={c} project={project} completedCount={identificationCount} />
+        <SeismicCard
+          c={c}
+          project={project}
+          seismic={seismic}
+          wilayaName={wilaya ? `${wilaya.code} - ${wilaya.name}` : 'Chargement...'}
+          wilayaHasSplitZones={Boolean(wilaya?.has_split_zones)}
+          hasCommunes={hasCommunes}
+          seismicReady={seismicReady}
+          hasPlanGeometry={hasPlanGeometry}
+          onOpenQF={setShowQF}
+          onOpenR={setShowR}
+        />
+        <GeometryMassesCard
+          c={c}
+          project={project}
+          structural={structural}
+          totalW={totalW}
+          hn={hn}
+          storyCount={storyCount}
+          filledStoryCount={filledStoryCount}
+          geometryReady={geometryReady}
+        />
       </div>
 
-      {/* ── Body: Row 1 + Row 2 ─────────────────────────────────────────────── */}
-      <div style={{
-        flex: 1, display: 'flex', flexDirection: 'column',
-        overflow: 'hidden', gap: 10, padding: '0 12px 12px',
-        minHeight: 0,
-      }}>
-
-        {/* ── ROW 1: Three input columns (~58% height) ──────────────────────── */}
-        <div style={{
-          flex: '0 0 58%', display: 'flex', gap: 10,
-          overflow: 'hidden', minHeight: 0,
-        }}>
-
-          {/* Col 1 — Identification */}
-          <div style={{ width: 210, flexShrink: 0 }}>
-            <div style={cardStyle}>
-              <BlockHeader title="1 — Identification" color={c.textMuted} c={c}/>
-              <div style={{fontSize:11,color:c.textMuted,marginBottom:10,fontStyle:"italic"}}>
-                Facultatif — généré automatiquement si vide
-              </div>
-
-              <Field label="Nom du projet" c={c}>
-                <TextInput value={project.projectName}
-                  onChange={v => project.setProjectMeta({ projectName: v })}
-                  placeholder={`Projet_${project.date}`} c={c}/>
-              </Field>
-              <Field label="Ingénieur" c={c}>
-                <TextInput value={project.engineer}
-                  onChange={v => project.setProjectMeta({ engineer: v })}
-                  placeholder="Nom de l'ingénieur" c={c}/>
-              </Field>
-              <Field label="Référence" c={c}>
-                <TextInput value={project.reference}
-                  onChange={v => project.setProjectMeta({ reference: v })}
-                  placeholder="Réf. dossier" c={c}/>
-              </Field>
-              <Field label="Date" c={c}>
-                <div style={{background:c.elevated,border:`1px solid ${c.border}`,
-                  borderRadius:8,padding:"8px 10px",fontSize:13,color:c.textMuted}}>
-                  {project.date}
-                </div>
-              </Field>
-            </div>
-          </div>
-
-          {/* Col 2 — Paramètres sismiques */}
-          <div style={{ width: 250, flexShrink: 0 }}>
-            <div style={cardStyle}>
-              <BlockHeader title="2 — Paramètres sismiques" color={c.blue} c={c}/>
-
-              {/* Wilaya */}
-              <Field label="Wilaya" c={c}>
-                <select value={project.wilayaCode} onChange={e => project.setWilaya(e.target.value)}
-                  disabled={project.wilayasLoading}
-                  style={inputStyle}>
-                  {project.wilayas.map(w => (
-                    <option key={w.code} value={w.code}>{w.code} — {w.name}</option>
-                  ))}
-                </select>
-              </Field>
-
-              {/* Commune — only if split wilaya with communes */}
-              {wilaya?.has_split_zones && hasCommunes && (
-                <Field label="Commune" c={c}>
-                  <select value={project.commune} onChange={e => project.setCommune(e.target.value)}
-                    disabled={project.communesLoading} title="Commune"
-                    style={{...inputStyle,border:`1px solid ${c.amber}66`}}>
-                    <option value="">— Autre commune (Zone {wilaya.zone})</option>
-                    {[...project.communes]
-                      .sort((a,b) => a.zone.localeCompare(b.zone)||a.name.localeCompare(b.name))
-                      .map(cm => (
-                        <option key={cm.name} value={cm.name}>{cm.name} → Zone {cm.zone}</option>
-                      ))}
-                  </select>
-                </Field>
-              )}
-              {wilaya?.has_split_zones && !hasCommunes && !project.communesLoading && (
-                <div style={{background:c.amber+"11",border:`1px solid ${c.amber}44`,
-                  borderRadius:8,padding:"8px 10px",fontSize:11,color:c.amber,
-                  lineHeight:1.5,marginBottom:10}}>
-                  ⚠️ Wilaya partagée — consulter l'Annexe A du RPA 2024
-                </div>
-              )}
-
-              {/* Zone display */}
-              <div style={{background:isZone0 ? c.amber+"18" : c.blue+"18",
-                border:`1px solid ${isZone0 ? c.amber : c.blue}55`,
-                borderRadius:8,padding:"8px 11px",marginBottom:10}}>
-                <div style={{fontSize:10,color:c.textMuted,marginBottom:2,
-                  textTransform:"uppercase",letterSpacing:"0.06em"}}>Zone sismique</div>
-                <div style={{fontSize:14,fontWeight:700,color:isZone0 ? c.amber : c.blue}}>
-                  {ZONE_LABELS[project.zone] || project.zone}
-                </div>
-              </div>
-
-              {/* Site class */}
-              <Field label="Classe de site" c={c}>
-                <div style={{display:"flex",gap:5}}>
-                  {["S1","S2","S3","S4"].map(s => (
-                    <button type="button" key={s} onClick={() => project.setSite(s)} style={{
-                      flex:1,padding:"6px 0",borderRadius:7,cursor:"pointer",
-                      border:`1px solid ${project.site===s ? c.green : c.border}`,
-                      background:project.site===s ? c.green+"22" : c.elevated,
-                      color:project.site===s ? c.green : c.textSec,
-                      fontSize:12,fontWeight:project.site===s ? 700 : 400}}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-
-              {/* Importance group */}
-              <Field label="Groupe d'importance" c={c}>
-                <select value={project.group} onChange={e => project.setGroup(e.target.value)}
-                  title="Groupe d'importance" style={inputStyle}>
-                  <option value="1A">Groupe 1A — I=1.4</option>
-                  <option value="1B">Groupe 1B — I=1.2</option>
-                  <option value="2">Groupe 2 — I=1.0</option>
-                  <option value="3">Groupe 3 — I=0.8</option>
-                </select>
-              </Field>
-
-              {/* ψ — Usage coefficient (Table 4.2 RPA 2024) */}
-              <Field label="Usage (ψ)" c={c}>
-                <select value={project.psiCase}
-                  onChange={e => project.setPsiCase(parseInt(e.target.value, 10))}
-                  title="Coefficient d'accompagnement ψ (Table 4.2 RPA 2024)"
-                  style={inputStyle}>
-                  <option value={1}>Habitation, bureaux (ψ = 0.30)</option>
-                  <option value={2}>Public temporaire — salles, restaurants… (ψ = 0.40)</option>
-                  <option value={3}>Entrepôts, hangars (ψ = 0.50)</option>
-                  <option value={4}>Archives, bibliothèques, réservoirs (ψ = 1.00)</option>
-                  <option value={5}>Autres locaux (ψ = 0.60)</option>
-                </select>
-              </Field>
-
-              {/* Type de structure (Table 5.2 RPA 2024) */}
-              <Field label="Type de structure" c={c}>
-                <select value={project.structureType} onChange={e => project.setStructureType(e.target.value)}
-                  title="Type de structure (Table 5.2)" style={inputStyle}>
-                  <option value="acier">Acier</option>
-                  <option value="beton_arme">Béton armé</option>
-                  <option value="paf">PAF</option>
-                  <option value="bois">Bois</option>
-                  <option value="maconnerie">Maçonnerie chaînée</option>
-                </select>
-              </Field>
-
-              {/* Éléments non structuraux (§5.10.2) */}
-              <Field label="Éléments non structuraux" c={c}>
-                <select value={project.nonStructuralType} onChange={e => project.setNonStructuralType(e.target.value)}
-                  title="Éléments non structuraux (§5.10.2)" style={inputStyle}>
-                  <option value="fragile">Fragiles</option>
-                  <option value="ductile">Ductiles</option>
-                </select>
-              </Field>
-
-              {/* Direction toggle */}
-              <Field label="Directions d'analyse (spectre)" c={c}>
-                <div style={{display:"flex",gap:6}}>
-                  <DirButton label="Direction unique" active={!seismic.twoDir}
-                    color={c.blue} onClick={() => seismic.setTwoDir(false)} c={c}/>
-                  <DirButton label="X et Y séparées" active={seismic.twoDir}
-                    color={c.purple} onClick={() => seismic.setTwoDir(true)} c={c}/>
-                </div>
-              </Field>
-
-              {/* QF and R — single or double */}
-              {!seismic.twoDir ? (
-                <>
-                  <Field label="Facteur qualité QF" c={c}>
-                    <button type="button" onClick={() => setShowQF("single")} style={{
-                      width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
-                      padding:"9px 11px",borderRadius:8,cursor:"pointer",
-                      background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:13}}>
-                      <span>Q<sub>F</sub> = <b style={{color:c.amber}}>{seismic.QF.toFixed(2)}</b></span>
-                      <span style={{fontSize:12,color:c.blue}}>Calculer →</span>
-                    </button>
-                  </Field>
-                  <Field label="Coeff. comportement R" c={c}>
-                    <button type="button" onClick={() => setShowR("single")} style={{
-                      width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
-                      padding:"9px 11px",borderRadius:8,cursor:"pointer",
-                      background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:13}}>
-                      <span>R = <b style={{color:c.red}}>{seismic.R}</b></span>
-                      <span style={{fontSize:12,color:c.blue}}>Identifier →</span>
-                    </button>
-                    <div style={{fontSize:11,color:c.textSec,marginTop:4,paddingLeft:2}}>
-                      Syst. {seismic.selSys} · Cat. Q<sub>F</sub> ({seismic.qfCat})
-                    </div>
-                  </Field>
-                </>
-              ) : (
-                <>
-                  {/* Direction X */}
-                  <div style={{background:c.blue+"11",border:`1px solid ${c.blue}33`,
-                    borderRadius:8,padding:"10px",marginBottom:8}}>
-                    <div style={{fontSize:11,color:c.blue,fontWeight:700,marginBottom:8,
-                      textTransform:"uppercase",letterSpacing:"0.06em"}}>Direction X</div>
-                    <button type="button" onClick={() => setShowQF("x")} style={{
-                      width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
-                      padding:"8px 10px",borderRadius:7,cursor:"pointer",
-                      background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12,marginBottom:6}}>
-                      <span>Q<sub>Fx</sub> = <b style={{color:c.amber}}>{seismic.QFx.toFixed(2)}</b></span>
-                      <span style={{fontSize:11,color:c.blue}}>Calculer →</span>
-                    </button>
-                    <button type="button" onClick={() => setShowR("x")} style={{
-                      width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
-                      padding:"8px 10px",borderRadius:7,cursor:"pointer",
-                      background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12}}>
-                      <span>Rx = <b style={{color:c.red}}>{seismic.Rx}</b></span>
-                      <span style={{fontSize:11,color:c.blue}}>Identifier →</span>
-                    </button>
-                  </div>
-                  {/* Direction Y */}
-                  <div style={{background:c.purple+"11",border:`1px solid ${c.purple}33`,
-                    borderRadius:8,padding:"10px"}}>
-                    <div style={{fontSize:11,color:c.purple,fontWeight:700,marginBottom:8,
-                      textTransform:"uppercase",letterSpacing:"0.06em"}}>Direction Y</div>
-                    <button type="button" onClick={() => setShowQF("y")} style={{
-                      width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
-                      padding:"8px 10px",borderRadius:7,cursor:"pointer",
-                      background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12,marginBottom:6}}>
-                      <span>Q<sub>Fy</sub> = <b style={{color:c.amber}}>{seismic.QFy.toFixed(2)}</b></span>
-                      <span style={{fontSize:11,color:c.blue}}>Calculer →</span>
-                    </button>
-                    <button type="button" onClick={() => setShowR("y")} style={{
-                      width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",
-                      padding:"8px 10px",borderRadius:7,cursor:"pointer",
-                      background:c.elevated,border:`1px solid ${c.border}`,color:c.text,fontSize:12}}>
-                      <span>Ry = <b style={{color:c.red}}>{seismic.Ry}</b></span>
-                      <span style={{fontSize:11,color:c.blue}}>Identifier →</span>
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {/* Structural system for period */}
-              <Field label="Système pour période T (CT)" c={c}>
-                <select value={seismic.frameSys} onChange={e => seismic.setField('frameSys', e.target.value)}
-                  title="Système pour période T" style={inputStyle}>
-                  {FRAME_SYSTEMS.map(f => (
-                    <option key={f.v} value={f.v}>{f.ct} — {f.l.split(" ").slice(0,4).join(" ")}</option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-          </div>
-
-          {/* Col 3 — Géométrie et masses */}
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <div style={cardStyle}>
-              <BlockHeader title="3 — Géométrie et masses" color={c.green} c={c}/>
-
-              {/* Column headers */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 60px 70px 70px 70px 28px",
-                gap:5,marginBottom:6}}>
-                {["Niveau","h (m)","W (kN)","δek,x (m)","δek,y (m)",""].map((h,i) => (
-                  <div key={i} style={{fontSize:10,color:c.textMuted,
-                    textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>{h}</div>
-                ))}
-              </div>
-
-              {/* Storey rows */}
-              <div style={{display:"flex",flexDirection:"column",gap:5,
-                overflowY:"auto",marginBottom:10,maxHeight:"calc(100% - 200px)"}}>
-                {structural.stories.map(s => (
-                  <div key={s.id} style={{display:"grid",
-                    gridTemplateColumns:"1fr 60px 70px 70px 70px 28px",gap:5,alignItems:"center"}}>
-                    <input value={s.name} title="Nom du niveau" placeholder="Niveau"
-                      onChange={e => structural.updateStory(s.id, "name", e.target.value)}
-                      style={{background:c.elevated,border:`1px solid ${c.border}`,
-                        borderRadius:6,padding:"6px 7px",color:c.text,fontSize:12,
-                        outline:"none",width:"100%"}}/>
-                    <input type="number" value={s.elevation} min={0} step={0.5}
-                      title="Hauteur (m)" placeholder="h"
-                      onChange={e => structural.updateStory(s.id, "elevation", e.target.value)}
-                      style={{background:c.elevated,border:`1px solid ${c.border}`,
-                        borderRadius:6,padding:"6px 7px",color:c.purple,
-                        fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
-                    <input type="number" value={s.weight} min={0}
-                      title="Poids (kN)" placeholder="W"
-                      onChange={e => structural.updateStory(s.id, "weight", e.target.value)}
-                      style={{background:c.elevated,border:`1px solid ${c.border}`,
-                        borderRadius:6,padding:"6px 7px",color:c.green,
-                        fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
-                    <input type="number" value={s.dek_x||""} min={0} step={0.0001}
-                      title="Déplacement élastique X (m)" placeholder="—"
-                      onChange={e => structural.updateStory(s.id, "dek_x", e.target.value)}
-                      style={{background:c.elevated,border:`1px solid ${c.blue}44`,
-                        borderRadius:6,padding:"6px 7px",color:c.blue,
-                        fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
-                    <input type="number" value={s.dek_y||""} min={0} step={0.0001}
-                      title="Déplacement élastique Y (m)" placeholder="—"
-                      onChange={e => structural.updateStory(s.id, "dek_y", e.target.value)}
-                      style={{background:c.elevated,border:`1px solid ${c.purple}44`,
-                        borderRadius:6,padding:"6px 7px",color:c.purple,
-                        fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
-                    <button type="button" onClick={() => structural.removeStory(s.id)}
-                      disabled={structural.stories.length<=1}
-                      style={{width:24,height:24,borderRadius:5,cursor:"pointer",
-                        background:structural.stories.length>1 ? c.red+"22" : "transparent",
-                        border:structural.stories.length>1 ? `1px solid ${c.red}44` : "1px solid transparent",
-                        color:structural.stories.length>1 ? c.red : c.textMuted,
-                        fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <button type="button" onClick={() => structural.addStory()} style={{
-                width:"100%",padding:"7px",borderRadius:7,cursor:"pointer",
-                background:c.green+"22",border:`1px solid ${c.green}44`,
-                color:c.green,fontSize:12,fontWeight:600,marginBottom:10}}>
-                + Ajouter un niveau
-              </button>
-
-              {/* Totals */}
-              <div style={{background:c.elevated,borderRadius:8,padding:"8px 11px",
-                display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                <span style={{fontSize:11,color:c.textMuted}}>Poids total W</span>
-                <span style={{fontSize:14,fontWeight:700,color:c.green,fontFamily:"monospace"}}>
-                  {totalW.toFixed(0)} kN
-                </span>
-              </div>
-              <div style={{background:c.elevated,borderRadius:8,padding:"8px 11px",
-                display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:11,color:c.textMuted}}>Hauteur totale h<sub>n</sub></span>
-                <span style={{fontSize:14,fontWeight:700,color:c.purple,fontFamily:"monospace"}}>
-                  {hn.toFixed(1)} m
-                </span>
-              </div>
-
-              {/* GÉOMÉTRIE EN PLAN */}
-              <div style={{marginTop:10}}>
-                <div style={{fontSize:10,letterSpacing:"0.08em",fontWeight:700,
-                  color:c.textMuted,textTransform:"uppercase",marginBottom:8}}>
-                  Géométrie en plan
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
-                  <div>
-                    <label style={{fontSize:10,color:c.textSec,display:"block",
-                      textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,marginBottom:3}}>
-                      Lx (m)
-                    </label>
-                    <input type="number" value={project.lx||""} min={0} step={0.5}
-                      placeholder="0" title="Dimension en plan X (m)"
-                      onChange={e => project.setLx(parseFloat(e.target.value)||0)}
-                      style={{background:c.elevated,border:`1px solid ${c.border}`,
-                        borderRadius:6,padding:"6px 7px",color:c.text,
-                        fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
-                  </div>
-                  <div>
-                    <label style={{fontSize:10,color:c.textSec,display:"block",
-                      textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,marginBottom:3}}>
-                      Ly (m)
-                    </label>
-                    <input type="number" value={project.ly||""} min={0} step={0.5}
-                      placeholder="0" title="Dimension en plan Y (m)"
-                      onChange={e => project.setLy(parseFloat(e.target.value)||0)}
-                      style={{background:c.elevated,border:`1px solid ${c.border}`,
-                        borderRadius:6,padding:"6px 7px",color:c.text,
-                        fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
-                  </div>
-                  <div>
-                    <label style={{fontSize:10,color:c.textSec,display:"block",
-                      textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,marginBottom:3}}>
-                      μ (frott.)
-                    </label>
-                    <input type="number" value={project.mu} min={0} max={1} step={0.05}
-                      placeholder="0.40" title="Coefficient de frottement sol-fondation"
-                      onChange={e => project.setMu(parseFloat(e.target.value)||0.40)}
-                      style={{background:c.elevated,border:`1px solid ${c.border}`,
-                        borderRadius:6,padding:"6px 7px",color:c.text,
-                        fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── ROW 2: Full-width results ────────────────────────────────────── */}
-        <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
-          <div style={{
-            background: c.surface, border: `1px solid ${c.border}`,
-            borderRadius: 14, padding: 16,
-            height: '100%', display: 'flex', flexDirection: 'column',
-            overflow: 'hidden', boxSizing: 'border-box',
-          }}>
-            <BlockHeader title="4 — Résultats analyse dynamique" color={c.amber} c={c}/>
-
-            {/* Import status bar */}
-            <div style={{background:c.elevated,border:`1px solid ${c.border}`,
-              borderRadius:8,padding:"8px 13px",marginBottom:12,flexShrink:0,
-              display:"flex",alignItems:"center",gap:10}}>
-              <div style={{width:8,height:8,borderRadius:"50%",background:c.borderLight,flexShrink:0}}/>
-              <span style={{fontSize:12,color:c.textMuted,flex:1}}>
-                Robot / ETABS non connecté — saisie manuelle
-              </span>
-              <button type="button" style={{padding:"5px 11px",borderRadius:6,cursor:"not-allowed",
-                background:c.border,border:"none",color:c.textMuted,fontSize:11}}>
-                Importer
-              </button>
-            </div>
-
-            {/* Main content: side by side */}
-            <div style={{ flex: 1, display: 'flex', gap: 16, overflow: 'hidden', minHeight: 0 }}>
-
-              {/* Left: Périodes + Efforts + Status */}
-              <div style={{ width: 320, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {/* Periods and dynamic shear 2×2 */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                  {([
-                    {label:"Période Tx (s)",      key:"Tx"  as const, color:c.blue,   val:seismic.Tx},
-                    {label:"Période Ty (s)",      key:"Ty"  as const, color:c.purple, val:seismic.Ty},
-                    {label:"Effort dyn. Vxd (kN)",key:"Vxd" as const, color:c.blue,   val:seismic.Vxd},
-                    {label:"Effort dyn. Vyd (kN)",key:"Vyd" as const, color:c.purple, val:seismic.Vyd},
-                  ]).map(f => (
-                    <div key={f.key}>
-                      <label style={{fontSize:11,color:c.textSec,display:"block",
-                        textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,marginBottom:4}}>
-                        {f.label}
-                      </label>
-                      <input type="number" value={f.val} step="0.01" min={0}
-                        placeholder="—"
-                        onChange={e => seismic.setField(f.key, e.target.value)}
-                        style={{width:"100%",background:c.elevated,border:`1px solid ${f.color}44`,
-                          borderRadius:8,padding:"8px 10px",color:f.color,
-                          fontSize:14,fontFamily:"monospace",outline:"none"}}/>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Status summary */}
-                <div style={{background:c.elevated,borderRadius:8,padding:"10px 12px"}}>
-                  <div style={{fontSize:11,color:c.textMuted,marginBottom:6,
-                    textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>
-                    Données disponibles
-                  </div>
-                  {[
-                    {label:"Périodes Tx/Ty",     ok:!!(seismic.Tx && seismic.Ty)},
-                    {label:"Efforts Vxd/Vyd",    ok:!!(seismic.Vxd && seismic.Vyd)},
-                    {label:"Déplacements drx",   ok:structural.stories.some(s => s.drx)},
-                    {label:"Déplacements dry",   ok:structural.stories.some(s => s.dry)},
-                  ].map(item => (
-                    <div key={item.label} style={{display:"flex",alignItems:"center",gap:8,
-                      fontSize:12,color:item.ok ? c.green : c.textMuted,marginBottom:3}}>
-                      <span style={{fontSize:14}}>{item.ok ? "✅" : "○"}</span>
-                      {item.label}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Right: Déplacements inter-étages table */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-                <div style={{fontSize:11,letterSpacing:"0.06em",color:c.textSec,
-                  textTransform:"uppercase",fontWeight:600,marginBottom:8,flexShrink:0}}>
-                  Déplacements inter-étages relatifs (cm)
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 80px 80px",
-                  gap:6,marginBottom:6,flexShrink:0}}>
-                  {["Niveau","drx (cm)","dry (cm)"].map(h => (
-                    <div key={h} style={{fontSize:10,color:c.textMuted,
-                      textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>{h}</div>
-                  ))}
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:4,overflowY:"auto",flex:1}}>
-                  {structural.stories.map(s => (
-                    <div key={s.id} style={{display:"grid",gridTemplateColumns:"1fr 80px 80px",gap:6,alignItems:"center"}}>
-                      <div style={{fontSize:12,color:c.textSec,padding:"4px 0"}}>{s.name}</div>
-                      <input type="number" value={s.drx||""} step="0.001" min={0}
-                        placeholder="—"
-                        onChange={e => structural.updateStory(s.id, "drx", e.target.value)}
-                        style={{background:c.elevated,border:`1px solid ${c.blue}44`,
-                          borderRadius:6,padding:"5px 7px",color:c.blue,
-                          fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
-                      <input type="number" value={s.dry||""} step="0.001" min={0}
-                        placeholder="—"
-                        onChange={e => structural.updateStory(s.id, "dry", e.target.value)}
-                        style={{background:c.elevated,border:`1px solid ${c.purple}44`,
-                          borderRadius:6,padding:"5px 7px",color:c.purple,
-                          fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
+      <DynamicResultsCard
+        c={c}
+        seismic={seismic}
+        structural={structural}
+        dynamicReady={dynamicReady}
+        missingDynamic={missingDynamic}
+      />
     </div>
   )
 }

@@ -16,10 +16,10 @@ interface StructuralState {
 }
 
 const DEFAULT_STORIES: Story[] = [
-  { id: 1, name: 'RDC',     elevation: '3.0',  weight: '1200', drx: '', dry: '', dek_x: '', dek_y: '' },
-  { id: 2, name: 'Etage 1', elevation: '6.0',  weight: '1100', drx: '', dry: '', dek_x: '', dek_y: '' },
-  { id: 3, name: 'Etage 2', elevation: '9.0',  weight: '1100', drx: '', dry: '', dek_x: '', dek_y: '' },
-  { id: 4, name: 'Etage 3', elevation: '12.0', weight: '900',  drx: '', dry: '', dek_x: '', dek_y: '' },
+  { id: 1, name: 'RDC',     elevation: '3.0',  weight: '1200', dek_x: '', dek_y: '' },
+  { id: 2, name: 'Etage 1', elevation: '6.0',  weight: '1100', dek_x: '', dek_y: '' },
+  { id: 3, name: 'Etage 2', elevation: '9.0',  weight: '1100', dek_x: '', dek_y: '' },
+  { id: 4, name: 'Etage 3', elevation: '12.0', weight: '900',  dek_x: '', dek_y: '' },
 ];
 
 export const useStructuralStore = create<StructuralState>((set, get) => ({
@@ -37,8 +37,6 @@ export const useStructuralStore = create<StructuralState>((set, get) => ({
       name: `Etage ${stories.length}`,
       elevation: (lastElev + step).toFixed(1),
       weight: last?.weight || '1000',
-      drx: '',
-      dry: '',
       dek_x: '',
       dek_y: '',
     };
@@ -67,6 +65,26 @@ export const useStructuralStore = create<StructuralState>((set, get) => ({
   serializeState: () => ({ stories: get().stories }),
 
   hydrateState: (state) => {
-    if (state.stories) set({ stories: state.stories });
+    if (state.stories) {
+      // Migration: old projects stored dek_x/dek_y in meters (0.001–0.05 range).
+      // New format stores centimeters. Detect by checking if any value is > 0 and < 0.5.
+      const stories = state.stories.map(s => ({ dek_x: '', dek_y: '', ...s }))
+      const needsMigration = stories.some(s => {
+        const x = parseFloat(s.dek_x)
+        const y = parseFloat(s.dek_y)
+        return (x > 0 && x < 0.5) || (y > 0 && y < 0.5)
+      })
+      if (needsMigration) {
+        set({
+          stories: stories.map(s => ({
+            ...s,
+            dek_x: s.dek_x ? String(parseFloat(s.dek_x) * 100) : '',
+            dek_y: s.dek_y ? String(parseFloat(s.dek_y) * 100) : '',
+          })),
+        })
+      } else {
+        set({ stories })
+      }
+    }
   },
 }));
