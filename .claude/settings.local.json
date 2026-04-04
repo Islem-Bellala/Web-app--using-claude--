@@ -34,7 +34,8 @@
       "Bash(python -m pytest tests/engine/seismic/test_displacements.py tests/engine/seismic/test_p_delta.py tests/engine/seismic/test_overturning.py -v)",
       "Bash(python -m pytest tests/ -v --tb=short)",
       "Bash(python -m pytest tests/ -q)",
-      "Bash(python -m pytest tests/ -q --tb=no)"
+      "Bash(python -m pytest tests/ -q --tb=no)",
+      "Read(//c/Users/ASUS/Documents/GitHub/Web-app---using-claude---/*/.vite/**)"
     ]
   }
 }

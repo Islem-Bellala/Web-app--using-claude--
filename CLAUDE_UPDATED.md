@@ -538,7 +538,7 @@ bunyan/                                    # Project root
 - Use pytest parametrize for multiple input cases
 - No calculation module is complete without passing tests
 - Backend tests use isolated per-test async engines (Windows-compatible)
-- Total: 73 tests passing (52 engine + 21 backend)
+- Total: 221 tests passing (engine + backend)
 
 ---
 
@@ -577,6 +577,11 @@ bunyan/                                    # Project root
 | LoginPage | authStore |
 | QFModal | props from parent (controlled) |
 | RModal | props from parent (controlled) |
+| CombinationsPage | projectStore (zone, group, psi) |
+| SeismicVerificationPage | uiStore (tab state) |
+| DisplacementsTab | structuralStore + seismicStore + projectStore |
+| PDeltaTab | structuralStore + seismicStore + projectStore |
+| OverturningTab | structuralStore + seismicStore + projectStore |
 
 ---
 
@@ -688,25 +693,72 @@ Errors must be descriptive, logged, and user-friendly (in French).
 
 ## 15. CURRENT STATE
 
+### v1 Deployed — bunyan.up.railway.app
+
+- ✅ **221/221 tests passing** (engine + backend), 0 TypeScript errors
+- ✅ **Deployed to Railway**: PostgreSQL + FastAPI + React SPA
+- ✅ Auto-deploy from `main` branch via Dockerfile
+
 ### All Foundation Phases Complete
 
-- ✅ **Phase 1**: Project restructure, CLAUDE.md, annex_a.py, central router, config
-- ✅ **Phase 2**: Full TypeScript migration (0 tsc errors, all .tsx)
-- ✅ **Phase 3**: Zustand stores (4→5 stores), App.tsx thin shell
-- ✅ **Phase 4**: Data deduplication — single source of truth (annex_a.py → API → frontend)
-- ✅ **Phase 5**: PostgreSQL + JWT auth (async SQLAlchemy, Alembic, project CRUD)
-- ✅ **Phase 6**: UI structural fix (fixed viewport, Tailwind v4, two-row layout, branding, dark mode)
+- ✅ Phase 1: Project restructure, CLAUDE.md, annex_a.py, central router
+- ✅ Phase 2: Full TypeScript migration (0 tsc errors)
+- ✅ Phase 3: Zustand stores (5 stores), App.tsx thin shell (~29 lines)
+- ✅ Phase 4: Data deduplication (single source of truth)
+- ✅ Phase 5: PostgreSQL + JWT auth (async, Alembic, project CRUD)
+- ✅ Phase 6: UI structural fix (fixed viewport, Tailwind v4, branding)
 
-### Completed Engineering Modules
+### Completed Engineering Modules (calc_engine/)
 
-- ✅ **Elastic spectrum** Sae/g — `spectrum.py`
-- ✅ **Design spectrum** Sad Eq 3.15 + Svd Eq 3.16 — `design_spectrum.py`
-- ✅ **Base shear** V = λ·Sad·W Eq 3.1 — `base_shear.py`
-- ✅ **Annex A** — 58 wilayas, 35 split wilayas, commune-level zones — `annex_a.py`
-- ✅ **FastAPI endpoints** — spectrum, base_shear, annex_a, auth, projects, verifications (disp/p-delta/overturning)
-- ✅ **React pages** — ProjectParams, SpectrumChart, BaseShearPage, ProjectList, LoginPage
-- ✅ **221 passing tests** (142 engine + 46 backend + verification + deployment tests)
-- ✅ **Data model extended** — Story.dek_x/dek_y, projectStore: structureType, nonStructuralType, lx, ly, mu
+- ✅ `spectrum.py` — Elastic spectrum Sae/g
+- ✅ `design_spectrum.py` — Sad Eq 3.15 + Svd Eq 3.16
+- ✅ `base_shear.py` — V = λ·Sad·W (Eq 4.1)
+- ✅ `annex_a.py` — 58 wilayas, 35 split wilayas, commune-level zones
+- ✅ `combinations.py` — §5.2 Eqs 5.1-5.4, Table 5.1, 8 or 24 combos
+- ✅ `displacements.py` — §4.5.2 Eq 4.15 (δk = R/QF × δek), Eq 4.16, §5.10 drift
+- ✅ `p_delta.py` — §5.9 Eq 5.9 (θk), Eq 5.10 (Pk)
+- ✅ `overturning.py` — §5.5 renversement + glissement
+
+### Completed Backend Endpoints
+
+- ✅ `/api/v1/spectrum` — elastic + design spectrum
+- ✅ `/api/v1/base-shear` — base shear calculation
+- ✅ `/api/v1/annex-a` — wilaya/commune/zone data
+- ✅ `/api/v1/combinations` — seismic load combinations
+- ✅ `/api/v1/verifications/displacements` — drift check
+- ✅ `/api/v1/verifications/p-delta` — stability check
+- ✅ `/api/v1/verifications/overturning` — overturning + sliding
+- ✅ `/api/v1/auth/*` — register, login, refresh, me
+- ✅ `/api/v1/projects/*` — CRUD + JSONB state persistence
+- ✅ `/api/health` — health check for Railway
+
+### Completed React Pages
+
+- ✅ `LoginPage` — full-page login (outside Layout)
+- ✅ `ProjectList` — project selection / create new
+- ✅ `ProjectParams` — two-row layout (3 input cols + results row)
+- ✅ `SpectrumChart` — Sad + Svd charts, X/Y directions, .txt export
+- ✅ `CombinationsPage` — seismic load combinations table
+- ✅ `SeismicVerificationPage` — 4 horizontal tabs:
+  - Tab 1: Effort V (BaseShearPage embedded, auto-calc)
+  - Tab 2: Déplacements (DisplacementsTab, per-story drift table)
+  - Tab 3: P-Δ (PDeltaTab, θk stability with ✅/⚠️/❌ verdicts)
+  - Tab 4: Renversement (OverturningTab, two-column card layout)
+
+### Production Fixes Applied During Deploy
+
+- CORS format: comma-separated string parsing in `config.py`
+- bcrypt 72-byte limit: password `max_length=72` validation
+- Alembic async driver: `env.py` uses `settings.database_url` (with `+asyncpg`)
+- SPA fallback: explicit `"/"` root route + `"/{path:path}"` catch-all
+- Port mapping: Railway `PORT=8080`, networking configured to match
+
+### Key Data Model Additions (since Phase 6)
+
+- `projectStore`: psiCase/psi (ψ coefficient Table 4.2), structureType, nonStructuralType, lx, ly, mu
+- `structuralStore`: Story type has dek_x, dek_y (elastic displacements)
+- `authStore`: isInitializing flag (prevents "Chargement..." hang)
+- All persisted in JSONB state column
 
 ### Verified Annex A Corrections
 
@@ -716,99 +768,70 @@ Errors must be descriptive, logged, and user-friendly (in French).
 - 11 wilaya default zones corrected
 - 6 wrong zone values fixed across wilayas 20, 24, 25, 28, 29, 31
 
-### Known Issues (Pre-Deploy Fixes)
+### MVP v1 — COMPLETE ✅
 
-- Auth flow: app hangs on "Chargement..." on first load, skips login on refresh
-- Correct flow should be: Login → Projects list → ProjectParams
-- Default activePage should be 'projects' (not 'params') after login
-- BaseShearPage: remove per-story Fk distribution table and bar charts (keep base shear + 80% check)
+1. ✅ Fix auth flow (isInitializing pattern)
+2. ✅ Simplify BaseShearPage (removed Fk table + bar charts)
+3. ✅ Seismic combinations — §5.2 (standalone page)
+4. ✅ Displacement + drift check — §4.5.2 + §5.10 (verification tab)
+5. ✅ P-Δ effect — §5.9 (verification tab)
+6. ✅ Overturning — §5.5 (verification tab)
+7. ✅ SeismicVerificationPage with 4 horizontal tabs
+8. ✅ Deployed to Railway (bunyan.up.railway.app)
 
-### MVP Scope (Pre-First-Deploy)
+### Post-Deploy Roadmap
 
-1. ✅ Fix auth flow (login → projects → params)
-2. ✅ Simplify BaseShearPage (remove Fk table + bar charts, keep Robot export)
-3. ✅ Seismic combinations module — §5.2 (standalone page)
-4. ✅ Backend: displacement engine §4.5.2 + §5.10 — `displacements.py` + endpoint
-5. ✅ Backend: P-Δ engine §5.9 — `p_delta.py` + endpoint
-6. ✅ Backend: overturning engine §5.5 — `overturning.py` + endpoint
-7. ⬜ Frontend: SeismicVerificationPage with 4 tabs (Effort V, Déplacements, P-Δ, Renversement)
-8. ✅ Deploy to production — Dockerfile + railway.toml + scripts/start.sh
+**v1.x — Bridge + Feedback** (current phase)
+- ⬜ Robot/ETABS desktop bridge (Python agent, data input adapter)
+- ⬜ Use v1 on real projects, collect feedback from friends
+- ⬜ Fix critical bugs surfaced by real usage
 
-### Future Modules (Post-Deploy)
+**v2 — Polish Pass** (after bridge + real usage)
+- ⬜ Frontend UI/UX overhaul page by page
+- ⬜ Calculation corrections based on real project validation
+- ⬜ Social media launch
 
-- ⏳ Joints sismiques — §5.8 (deferred, not needed for MVP)
+**v3+ — Expansion**
+- ⏳ Joints sismiques — §5.8
 - ⏳ RC design — CBA93 (Beams → Columns → Walls → Foundations)
 - ⏳ RC design — BAEL91
 - ⏳ RC design — Eurocode 2
-- ⏳ Desktop bridge (Robot first, then ETABS) — data input adapter only
 - ⏳ Report generation (PDF, Word)
-- ⏳ Verification dashboard
 
 ---
 
 ## 16. KEY FORMULAS
 
-### Implemented
+### All Implemented
 - `Sad(T)/g` — Eq 3.15 (4 branches + floor 0.2·A·I)
 - `Svd(T)/g` — Eq 3.16 (alpha exponent, R=1.5 fixed)
 - `QF = 1 + ΣPq` — capped per category
-- `V = λ · Sad(T₀)/g · W` — where λ=0.85 if T₀≤2T₂ AND n>2, else 1.0
+- `V = λ · Sad(T₀)/g · W` — λ=0.85 if T₀≤2T₂ AND n>2, else 1.0
 - `Ft = 0.07·T₀·V` — (max 0.25V) if T₀ > 0.7s
-- `T_emp = CT · hₙ^0.75`
-- `T₀ = min(T_calc, 1.3·T_emp)`
+- `T_emp = CT · hₙ^0.75`, `T₀ = min(T_calc, 1.3·T_emp)`
 - 80% check: `Vt ≥ 0.8·V`, majoration coeff = 0.8·V/Vt
-
-### To Implement (MVP)
-- **Combinations (§5.2)**: `G + ψQ ± E`, `E1 = ±Ex ± 0.3Ey`, `E2 = ±0.3Ex ± Ey`
-  Vertical component Ez added if `Av·I·g > 0.25g` → E3, E4, E5 (up to 24 combos)
-- **Displacements (§4.5.2)**: `δk = (R / QF) × δek` (Eq 4.15), `Δk = δk − δk-1` (Eq 4.16)  ← R/QF not R×QF
-- **Drift check (§5.10)**: `Δk < limits` from Table 5.2 (non-effondrement + limitation de dommages)
-- **P-Δ (§5.9)**: `θk = (Pk × Δk) / (Vk × hk)` (Eq 5.9), `Pk = Σ(Gi + ψQi)` for i≥k (Eq 5.10)
-  θk < 0.10 → OK; 0.10–0.20 → amplify by 1/(1−θk); > 0.20 → unstable
-- **Overturning (§5.5)**: `M_stab / M_renvers ≥ 1.3`, sliding coefficient ≥ 1.25
+- Combinations §5.2: `G + ψQ ± E`, E1/E2 (8 combos), E3/E4/E5 if vertical (24 combos)
+- Displacements §4.5.2: `δk = (R / QF) × δek` (Eq 4.15), `Δk = δk − δk-1` (Eq 4.16)
+  ⚠️ CORRECTED: R / QF, NOT R × QF
+- Drift check §5.10: Table 5.2 limits (non-effondrement) + §5.10.2 (limitation dommages, νA=0.5)
+- P-Δ §5.9: `θk = (Pk × Δk) / (Vk × hk)` — OK/amplify/unstable verdicts
+- Overturning §5.5: `M_stab / M_renvers ≥ 1.3`, sliding ≥ 1.25
+- ψ coefficient (Table 4.2): 5 usage types, stored in projectStore
+- Av·I (Table 5.1): vertical acceleration, determines if Ez required
 
 ---
 
-## 17. DEPLOYMENT STRATEGY
+## 17. DEPLOYMENT — RAILWAY
 
-### Ship Early, Iterate in Production
+### Architecture: Single Service
 
-The project follows a "deploy MVP, then iterate" approach:
+FastAPI serves both API (`/api/v1/*`) and frontend (static + SPA fallback).
+One Dockerfile, one Railway service, one domain.
 
-1. **MVP**: Complete RPA 2024 seismic verification (all Chapter 4+5 checks) → deploy
-2. **Iterate**: Use the live app, collect feedback, fix bugs
-3. **Expand**: Add RC modules (CBA93/BAEL91/EC2) and Robot bridge as live updates
+### Live URL: bunyan.up.railway.app
 
-### Deployment Target: Railway
+### Startup Chain
 
-- **Single service**: FastAPI serves both the API and the Vite-built frontend
-- Backend: uvicorn (1 worker, `--host 0.0.0.0 --port $PORT`)
-- Frontend: `npm run build` in Docker Stage 1 → `frontend/dist/` served as static files
-- Database: Railway-managed PostgreSQL (URL normalized automatically from `postgres://`)
-- Migrations: `alembic upgrade head` runs inside `scripts/start.sh` before uvicorn
-- Auto-deploy: push to `main` → Railway rebuilds and deploys
-
-### Pre-Deployment Checklist
-
-- [ ] Auth flow working correctly (login → projects → params)
-- [ ] BaseShearPage simplified (Fk table + bar charts removed)
-- [ ] Seismic combinations page complete (§5.2)
-- [ ] Displacement + drift check tab complete (§4.5.2 + §5.10)
-- [ ] P-Δ tab complete (§5.9)
-- [ ] Overturning tab complete (§5.5)
-- [ ] SeismicVerificationPage with 4 tabs working
-- [x] CORS configured for production domain (env var `CORS_ORIGINS`)
-- [x] Environment variables for all secrets (see Railway section below)
-- [x] Alembic migrations run on production DB (via `scripts/start.sh`)
-- [x] Build succeeds (`npm run build` + backend starts)
-- [x] Dockerfile multi-stage build (frontend → backend+dist)
-- [x] `railway.toml` configured with health check + restart policy
-
-### Railway Deployment
-
-**Architecture:** Single service — FastAPI serves API + static frontend from `frontend/dist/`.
-
-**Startup chain:**
 ```
 Docker build:
   Stage 1 (node:20-alpine): npm ci → npm run build → frontend/dist/
@@ -820,16 +843,32 @@ Container start (scripts/start.sh):
 
 Request routing:
   /api/v1/*    → FastAPI routers (auth, projects, spectrum, etc.)
-  /api/health  → health check
+  /api/health  → Railway health check
   /assets/*    → frontend/dist/assets/ (JS, CSS, images)
+  /            → frontend/dist/index.html (explicit root route)
   /*           → frontend/dist/index.html (SPA fallback)
 ```
 
-**Environment Variables (set in Railway dashboard):**
-- `DATABASE_URL` — auto-linked from Railway PostgreSQL plugin (`postgres://...`, normalized automatically)
-- `JWT_SECRET_KEY` — generate with `openssl rand -hex 32`
-- `CORS_ORIGINS` — `https://YOUR-APP.up.railway.app` (comma-separated if multiple)
-- `ENVIRONMENT` — `production`
+### Environment Variables (Railway dashboard)
+
+| Variable | Source |
+|----------|--------|
+| `DATABASE_URL` | Railway PostgreSQL plugin (auto-linked, `postgres://` normalized by `config.py`) |
+| `JWT_SECRET_KEY` | Manual — `openssl rand -hex 32` |
+| `CORS_ORIGINS` | Manual — `https://bunyan.up.railway.app` |
+| `ENVIRONMENT` | Manual — `production` |
+
+### Config Handling (backend/config.py)
+
+- `DATABASE_URL` validator: `postgres://` → `postgresql+asyncpg://`
+- `sync_database_url` property: strips `+asyncpg` (reserved for future sync use)
+- `CORS_ORIGINS`: comma-separated string → parsed to list
+- Auth: password `max_length=72` (bcrypt limit), `bcrypt==4.0.1` pinned
+
+### Branch Workflow
+
+- `main` = always deployable, auto-deploys to Railway on push
+- Feature branches for new work, merge to main when ready
 
 ---
 
@@ -837,7 +876,7 @@ Request routing:
 
 ### Design Code Order
 
-1. **RPA 2024** (DTR BC 2.48) — Seismic *(MVP — in progress)*
+1. **RPA 2024** (DTR BC 2.48) — Seismic *(v1 complete — deployed)*
 2. **CBA93** — RC design (Algerian code)
 3. **BAEL91** — RC design (French code)
 4. **Eurocode 2** — RC design (European code)
