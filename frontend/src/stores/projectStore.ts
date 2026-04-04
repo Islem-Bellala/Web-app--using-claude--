@@ -23,6 +23,17 @@ interface ProjectStore {
   psiCase: number;
   psi: number;
 
+  // Structure classification (for drift limits Table 5.2 + §5.10.2)
+  structureType: string;       // "acier" | "beton_arme" | "paf" | "bois" | "maconnerie"
+  nonStructuralType: string;   // "fragile" | "ductile"
+
+  // Building plan dimensions (m)
+  lx: number;
+  ly: number;
+
+  // Soil-foundation friction coefficient (§5.5)
+  mu: number;
+
   // Project metadata (displayed in params form)
   projectName: string;
   engineer: string;
@@ -48,6 +59,11 @@ interface ProjectStore {
   setSite: (site: string) => void;
   setGroup: (group: string) => void;
   setPsiCase: (psiCase: number) => void;
+  setStructureType: (v: string) => void;
+  setNonStructuralType: (v: string) => void;
+  setLx: (v: number) => void;
+  setLy: (v: number) => void;
+  setMu: (v: number) => void;
   setProjectMeta: (meta: Partial<Pick<ProjectStore, 'projectName' | 'engineer' | 'reference' | 'date'>>) => void;
   resetProject: () => void;
 
@@ -85,6 +101,11 @@ const initialState = {
   group: '2',
   psiCase: 1,
   psi: 0.30,
+  structureType: 'beton_arme',
+  nonStructuralType: 'fragile',
+  lx: 0,
+  ly: 0,
+  mu: 0.40,
   projectName: '',
   engineer: '',
   reference: '',
@@ -106,6 +127,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setSite: (site) => set({ site }),
   setGroup: (group) => set({ group }),
   setPsiCase: (psiCase) => set({ psiCase, psi: PSI_LOOKUP[psiCase] ?? 0.30 }),
+  setStructureType: (structureType) => set({ structureType }),
+  setNonStructuralType: (nonStructuralType) => set({ nonStructuralType }),
+  setLx: (lx) => set({ lx }),
+  setLy: (ly) => set({ ly }),
+  setMu: (mu) => set({ mu }),
   setProjectMeta: (meta) => set((state) => ({ ...state, ...meta })),
   resetProject: () => set({
     ...initialState,
@@ -167,34 +193,44 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   serializeState: () => {
     const s = get();
     return {
-      wilayaCode: s.wilayaCode,
-      commune:    s.commune,
-      zone:       s.zone,
-      site:       s.site,
-      group:      s.group,
-      psiCase:    s.psiCase,
-      psi:        s.psi,
-      projectName: s.projectName,
-      engineer:   s.engineer,
-      reference:  s.reference,
-      date:       s.date,
+      wilayaCode:         s.wilayaCode,
+      commune:            s.commune,
+      zone:               s.zone,
+      site:               s.site,
+      group:              s.group,
+      psiCase:            s.psiCase,
+      psi:                s.psi,
+      structureType:      s.structureType,
+      nonStructuralType:  s.nonStructuralType,
+      lx:                 s.lx,
+      ly:                 s.ly,
+      mu:                 s.mu,
+      projectName:        s.projectName,
+      engineer:           s.engineer,
+      reference:          s.reference,
+      date:               s.date,
     };
   },
 
   hydrateState: (state) => {
     const psiCase = state.psiCase ?? 1;
     set({
-      wilayaCode:  state.wilayaCode  ?? get().wilayaCode,
-      commune:     state.commune     ?? '',
-      zone:        state.zone        ?? '',
-      site:        state.site        ?? get().site,
-      group:       state.group       ?? get().group,
+      wilayaCode:         state.wilayaCode         ?? get().wilayaCode,
+      commune:            state.commune             ?? '',
+      zone:               state.zone               ?? '',
+      site:               state.site               ?? get().site,
+      group:              state.group              ?? get().group,
       psiCase,
-      psi:         state.psi         ?? PSI_LOOKUP[psiCase] ?? 0.30,
-      projectName: state.projectName ?? '',
-      engineer:    state.engineer    ?? '',
-      reference:   state.reference   ?? '',
-      date:        state.date        ?? today,
+      psi:                state.psi                ?? PSI_LOOKUP[psiCase] ?? 0.30,
+      structureType:      state.structureType      ?? 'beton_arme',
+      nonStructuralType:  state.nonStructuralType  ?? 'fragile',
+      lx:                 state.lx                 ?? 0,
+      ly:                 state.ly                 ?? 0,
+      mu:                 state.mu                 ?? 0.40,
+      projectName:        state.projectName        ?? '',
+      engineer:           state.engineer           ?? '',
+      reference:          state.reference          ?? '',
+      date:               state.date               ?? today,
     });
   },
 

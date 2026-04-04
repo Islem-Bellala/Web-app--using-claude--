@@ -9,7 +9,32 @@
       "Bash(npx tsc:*)",
       "Bash(npm run:*)",
       "Bash(python -m pytest tests/ -v)",
-      "Bash(alembic init:*)"
+      "Bash(alembic init:*)",
+      "Bash(PGPASSWORD=postgres psql -U postgres -c \"\\\\l\")",
+      "Bash(PGPASSWORD=postgres psql -U postgres -c \"CREATE DATABASE bunyan;\")",
+      "Bash(python -c \"import asyncpg; print\\('asyncpg OK, version:', asyncpg.__version__\\)\")",
+      "Bash(timeout 5 python -m uvicorn backend.main:app --port 8099)",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"test@test.com\",\"password\":\"test\"}')",
+      "Bash(python -c ':*)",
+      "Bash(python -m uvicorn backend.main:app --port 8099)",
+      "Bash(curl -s http://localhost:8099/)",
+      "Bash(curl -s -X POST http://localhost:8099/api/v1/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"test@test.com\",\"password\":\"test\"}')",
+      "Bash(taskkill //F //PID 10792)",
+      "Bash(curl -sv http://localhost:8000/)",
+      "Bash(curl -s http://localhost:8098/)",
+      "Bash(taskkill //F //PID 17028)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //PID 13152)",
+      "Bash(taskkill //F //PID 668)",
+      "Bash(tasklist //FI \"PID eq 13152\")",
+      "Bash(tasklist //FI \"PID eq 668\")",
+      "Bash(taskkill //F //IM python.exe)",
+      "Bash(python -m uvicorn backend.main:app --reload --port 8000)",
+      "Bash(wc -l /c/Users/ASUS/Documents/GitHub/Web-app---using-claude---/calc_engine/seismic/rpa2024/*.py)",
+      "Bash(python -m pytest tests/engine/seismic/test_displacements.py tests/engine/seismic/test_p_delta.py tests/engine/seismic/test_overturning.py -v)",
+      "Bash(python -m pytest tests/ -v --tb=short)",
+      "Bash(python -m pytest tests/ -q)",
+      "Bash(python -m pytest tests/ -q --tb=no)"
     ]
   }
 }

@@ -13,6 +13,12 @@ import type {
   BaseShearResult,
   CombinationsRequest,
   CombinationsResponse,
+  DisplacementsRequest,
+  DisplacementsResponse,
+  PDeltaRequest,
+  PDeltaResponse,
+  OverturningRequest,
+  OverturningResponse,
   TokenResponse,
   User,
   ProjectSummary,
@@ -209,4 +215,39 @@ export async function apiSaveProjectState(id: string, state: ProjectState): Prom
 
 export async function apiDeleteProject(id: string): Promise<void> {
   await request<void>(`/projects/${id}`, { method: 'DELETE' })
+}
+
+// ── Verification Endpoints ────────────────────────────────────────────────────
+
+export async function computeDisplacements(
+  data: DisplacementsRequest,
+  signal?: AbortSignal,
+): Promise<DisplacementsResponse> {
+  return request<DisplacementsResponse>(
+    '/verifications/displacements',
+    { method: 'POST', body: JSON.stringify(data) },
+    signal,
+  )
+}
+
+export async function computePDelta(
+  data: PDeltaRequest,
+  signal?: AbortSignal,
+): Promise<PDeltaResponse> {
+  return request<PDeltaResponse>(
+    '/verifications/p-delta',
+    { method: 'POST', body: JSON.stringify(data) },
+    signal,
+  )
+}
+
+export async function computeOverturning(
+  data: OverturningRequest,
+  signal?: AbortSignal,
+): Promise<OverturningResponse> {
+  return request<OverturningResponse>(
+    '/verifications/overturning',
+    { method: 'POST', body: JSON.stringify(data) },
+    signal,
+  )
 }

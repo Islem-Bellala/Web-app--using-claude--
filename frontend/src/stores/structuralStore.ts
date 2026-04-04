@@ -16,10 +16,10 @@ interface StructuralState {
 }
 
 const DEFAULT_STORIES: Story[] = [
-  { id: 1, name: 'RDC',     elevation: '3.0',  weight: '1200', drx: '', dry: '' },
-  { id: 2, name: 'Etage 1', elevation: '6.0',  weight: '1100', drx: '', dry: '' },
-  { id: 3, name: 'Etage 2', elevation: '9.0',  weight: '1100', drx: '', dry: '' },
-  { id: 4, name: 'Etage 3', elevation: '12.0', weight: '900',  drx: '', dry: '' },
+  { id: 1, name: 'RDC',     elevation: '3.0',  weight: '1200', drx: '', dry: '', dek_x: '', dek_y: '' },
+  { id: 2, name: 'Etage 1', elevation: '6.0',  weight: '1100', drx: '', dry: '', dek_x: '', dek_y: '' },
+  { id: 3, name: 'Etage 2', elevation: '9.0',  weight: '1100', drx: '', dry: '', dek_x: '', dek_y: '' },
+  { id: 4, name: 'Etage 3', elevation: '12.0', weight: '900',  drx: '', dry: '', dek_x: '', dek_y: '' },
 ];
 
 export const useStructuralStore = create<StructuralState>((set, get) => ({
@@ -39,6 +39,8 @@ export const useStructuralStore = create<StructuralState>((set, get) => ({
       weight: last?.weight || '1000',
       drx: '',
       dry: '',
+      dek_x: '',
+      dek_y: '',
     };
     set({ stories: [...stories, newStory] });
   },

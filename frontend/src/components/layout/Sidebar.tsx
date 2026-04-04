@@ -4,7 +4,7 @@ import { useProjectStore } from '../../stores/projectStore'
 import { getColors } from '../../theme'
 
 // Pages that require an open project before they can be accessed
-const PROJECT_REQUIRED = new Set(['params', 'spectrum', 'base_shear', 'combinations'])
+const PROJECT_REQUIRED = new Set(['params', 'spectrum', 'combinations', 'verification'])
 
 interface NavItem { id: string; label: string; icon: string; ready: boolean }
 interface NavGroup { section: string; items: NavItem[] }
@@ -20,9 +20,9 @@ const NAV: NavGroup[] = [
   {
     section: 'Sismique — RPA 2024',
     items: [
-      { id:'spectrum',     label:'Spectre de réponse', icon:'📈', ready:true  },
-      { id:'base_shear',   label:'Effort tranchant V', icon:'⚡', ready:true  },
-      { id:'combinations', label:'Combinaisons',        icon:'🔗', ready:true  },
+      { id:'spectrum',     label:'Spectre de réponse',    icon:'📈', ready:true  },
+      { id:'combinations', label:'Combinaisons',           icon:'🔗', ready:true  },
+      { id:'verification', label:'Vérification sismique',  icon:'✅', ready:true  },
     ],
   },
   {

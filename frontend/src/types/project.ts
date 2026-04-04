@@ -22,6 +22,11 @@ export interface ProjectState {
     date: string
     psiCase: number
     psi: number
+    structureType: string
+    nonStructuralType: string
+    lx: number
+    ly: number
+    mu: number
   }
   seismic: {
     twoDir: boolean
@@ -66,6 +71,8 @@ export interface Story {
   weight: string;
   drx: string;
   dry: string;
+  dek_x: string;  // elastic displacement X from Robot/ETABS (m)
+  dek_y: string;  // elastic displacement Y from Robot/ETABS (m)
 }
 
 // Full global params object (DEFAULT_PARAMS shape from App.tsx)

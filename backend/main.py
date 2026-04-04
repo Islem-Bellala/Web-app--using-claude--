@@ -17,9 +17,12 @@ CORS is configured via backend/config.py (reads from .env if present).
 """
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.config import settings
 from backend.api.v1.router import api_router
@@ -64,8 +67,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins     = settings.cors_origins,
     allow_credentials = True,
-    allow_methods     = ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers     = ["Content-Type", "Authorization"],
+    allow_methods     = ["*"],
+    allow_headers     = ["*"],
 )
 
 
@@ -106,3 +109,32 @@ def health():
             "combinations": "pending",
         },
     }
+
+
+@app.get("/api/health", tags=["Health"])
+def api_health():
+    """Production health check for Railway / uptime monitors."""
+    return {"status": "ok", "version": "1.0.0"}
+
+
+# =============================================================================
+# STATIC FILES — serve the frontend build in production
+# Must be registered AFTER all API routes so the catch-all doesn't intercept them.
+# =============================================================================
+
+_frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+
+if _frontend_dist.exists():
+    app.mount(
+        "/assets",
+        StaticFiles(directory=_frontend_dist / "assets"),
+        name="assets",
+    )
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def spa_fallback(path: str):
+        """SPA fallback — serve index.html for any non-API route."""
+        file_path = _frontend_dist / path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(_frontend_dist / "index.html")

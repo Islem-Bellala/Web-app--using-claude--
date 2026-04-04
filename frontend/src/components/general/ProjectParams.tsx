@@ -340,6 +340,27 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
                 </select>
               </Field>
 
+              {/* Type de structure (Table 5.2 RPA 2024) */}
+              <Field label="Type de structure" c={c}>
+                <select value={project.structureType} onChange={e => project.setStructureType(e.target.value)}
+                  title="Type de structure (Table 5.2)" style={inputStyle}>
+                  <option value="acier">Acier</option>
+                  <option value="beton_arme">Béton armé</option>
+                  <option value="paf">PAF</option>
+                  <option value="bois">Bois</option>
+                  <option value="maconnerie">Maçonnerie chaînée</option>
+                </select>
+              </Field>
+
+              {/* Éléments non structuraux (§5.10.2) */}
+              <Field label="Éléments non structuraux" c={c}>
+                <select value={project.nonStructuralType} onChange={e => project.setNonStructuralType(e.target.value)}
+                  title="Éléments non structuraux (§5.10.2)" style={inputStyle}>
+                  <option value="fragile">Fragiles</option>
+                  <option value="ductile">Ductiles</option>
+                </select>
+              </Field>
+
               {/* Direction toggle */}
               <Field label="Directions d'analyse (spectre)" c={c}>
                 <div style={{display:"flex",gap:6}}>
@@ -438,9 +459,9 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
               <BlockHeader title="3 — Géométrie et masses" color={c.green} c={c}/>
 
               {/* Column headers */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 65px 75px 28px",
-                gap:6,marginBottom:6}}>
-                {["Niveau","h (m)","W (kN)",""].map((h,i) => (
+              <div style={{display:"grid",gridTemplateColumns:"1fr 60px 70px 70px 70px 28px",
+                gap:5,marginBottom:6}}>
+                {["Niveau","h (m)","W (kN)","δek,x (m)","δek,y (m)",""].map((h,i) => (
                   <div key={i} style={{fontSize:10,color:c.textMuted,
                     textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600}}>{h}</div>
                 ))}
@@ -451,7 +472,7 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
                 overflowY:"auto",marginBottom:10,maxHeight:"calc(100% - 200px)"}}>
                 {structural.stories.map(s => (
                   <div key={s.id} style={{display:"grid",
-                    gridTemplateColumns:"1fr 65px 75px 28px",gap:6,alignItems:"center"}}>
+                    gridTemplateColumns:"1fr 60px 70px 70px 70px 28px",gap:5,alignItems:"center"}}>
                     <input value={s.name} title="Nom du niveau" placeholder="Niveau"
                       onChange={e => structural.updateStory(s.id, "name", e.target.value)}
                       style={{background:c.elevated,border:`1px solid ${c.border}`,
@@ -468,6 +489,18 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
                       onChange={e => structural.updateStory(s.id, "weight", e.target.value)}
                       style={{background:c.elevated,border:`1px solid ${c.border}`,
                         borderRadius:6,padding:"6px 7px",color:c.green,
+                        fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
+                    <input type="number" value={s.dek_x||""} min={0} step={0.0001}
+                      title="Déplacement élastique X (m)" placeholder="—"
+                      onChange={e => structural.updateStory(s.id, "dek_x", e.target.value)}
+                      style={{background:c.elevated,border:`1px solid ${c.blue}44`,
+                        borderRadius:6,padding:"6px 7px",color:c.blue,
+                        fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
+                    <input type="number" value={s.dek_y||""} min={0} step={0.0001}
+                      title="Déplacement élastique Y (m)" placeholder="—"
+                      onChange={e => structural.updateStory(s.id, "dek_y", e.target.value)}
+                      style={{background:c.elevated,border:`1px solid ${c.purple}44`,
+                        borderRadius:6,padding:"6px 7px",color:c.purple,
                         fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
                     <button type="button" onClick={() => structural.removeStory(s.id)}
                       disabled={structural.stories.length<=1}
@@ -503,6 +536,52 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
                 <span style={{fontSize:14,fontWeight:700,color:c.purple,fontFamily:"monospace"}}>
                   {hn.toFixed(1)} m
                 </span>
+              </div>
+
+              {/* GÉOMÉTRIE EN PLAN */}
+              <div style={{marginTop:10}}>
+                <div style={{fontSize:10,letterSpacing:"0.08em",fontWeight:700,
+                  color:c.textMuted,textTransform:"uppercase",marginBottom:8}}>
+                  Géométrie en plan
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+                  <div>
+                    <label style={{fontSize:10,color:c.textSec,display:"block",
+                      textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,marginBottom:3}}>
+                      Lx (m)
+                    </label>
+                    <input type="number" value={project.lx||""} min={0} step={0.5}
+                      placeholder="0" title="Dimension en plan X (m)"
+                      onChange={e => project.setLx(parseFloat(e.target.value)||0)}
+                      style={{background:c.elevated,border:`1px solid ${c.border}`,
+                        borderRadius:6,padding:"6px 7px",color:c.text,
+                        fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:c.textSec,display:"block",
+                      textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,marginBottom:3}}>
+                      Ly (m)
+                    </label>
+                    <input type="number" value={project.ly||""} min={0} step={0.5}
+                      placeholder="0" title="Dimension en plan Y (m)"
+                      onChange={e => project.setLy(parseFloat(e.target.value)||0)}
+                      style={{background:c.elevated,border:`1px solid ${c.border}`,
+                        borderRadius:6,padding:"6px 7px",color:c.text,
+                        fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
+                  </div>
+                  <div>
+                    <label style={{fontSize:10,color:c.textSec,display:"block",
+                      textTransform:"uppercase",letterSpacing:"0.06em",fontWeight:600,marginBottom:3}}>
+                      μ (frott.)
+                    </label>
+                    <input type="number" value={project.mu} min={0} max={1} step={0.05}
+                      placeholder="0.40" title="Coefficient de frottement sol-fondation"
+                      onChange={e => project.setMu(parseFloat(e.target.value)||0.40)}
+                      style={{background:c.elevated,border:`1px solid ${c.border}`,
+                        borderRadius:6,padding:"6px 7px",color:c.text,
+                        fontSize:12,fontFamily:"monospace",outline:"none",width:"100%"}}/>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

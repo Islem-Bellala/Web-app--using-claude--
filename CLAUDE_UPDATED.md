@@ -316,8 +316,8 @@ where needed (e.g., drift table or P-Δ table for many stories).
 - **REMOVED**: per-story force distribution (Fk) table and bar charts
 
 **Tab 2 — Déplacements** (§4.5.2 + §5.10):
-- Compute Dk = R × QF × Dek at each level (Eq 4.15)
-- Relative displacement Δk = Dk − Dk-1 (Eq 4.16)
+- Compute δk = (R / QF) × δek at each level (Eq 4.15)  ← R/QF not R×QF
+- Relative displacement Δk = δk − δk-1 (Eq 4.16)
 - Drift check: Δk vs Table 5.2 limits (non-effondrement + limitation de dommages)
 - Status per story: ✅/❌
 
@@ -415,6 +415,7 @@ bunyan/                                    # Project root
 │   │   ├── annex_a.py
 │   │   ├── auth.py
 │   │   ├── project.py
+│   │   ├── verifications.py     # Displacements, P-Δ, overturning I/O schemas — NEW
 │   │   └── common.py
 │   ├── models/
 │   │   ├── user.py                      # SQLAlchemy User model
@@ -702,9 +703,10 @@ Errors must be descriptive, logged, and user-friendly (in French).
 - ✅ **Design spectrum** Sad Eq 3.15 + Svd Eq 3.16 — `design_spectrum.py`
 - ✅ **Base shear** V = λ·Sad·W Eq 3.1 — `base_shear.py`
 - ✅ **Annex A** — 58 wilayas, 35 split wilayas, commune-level zones — `annex_a.py`
-- ✅ **FastAPI endpoints** — spectrum, base_shear, annex_a, auth, projects
+- ✅ **FastAPI endpoints** — spectrum, base_shear, annex_a, auth, projects, verifications (disp/p-delta/overturning)
 - ✅ **React pages** — ProjectParams, SpectrumChart, BaseShearPage, ProjectList, LoginPage
-- ✅ **73 passing tests** (52 engine + 21 backend)
+- ✅ **221 passing tests** (142 engine + 46 backend + verification + deployment tests)
+- ✅ **Data model extended** — Story.dek_x/dek_y, projectStore: structureType, nonStructuralType, lx, ly, mu
 
 ### Verified Annex A Corrections
 
@@ -723,14 +725,14 @@ Errors must be descriptive, logged, and user-friendly (in French).
 
 ### MVP Scope (Pre-First-Deploy)
 
-1. ⬜ Fix auth flow (login → projects → params)
-2. ⬜ Simplify BaseShearPage (remove Fk table + bar charts, keep Robot export)
-3. ⬜ Seismic combinations module — §5.2 (standalone page)
-4. ⬜ Displacement calculation — §4.5.2 Dk + §5.10 drift check (tab in verification page)
-5. ⬜ P-Δ effect — §5.9 θk stability (tab in verification page)
-6. ⬜ Overturning check — §5.5 renversement + glissement (tab in verification page)
-7. ⬜ Integrate all into SeismicVerificationPage with horizontal tabs
-8. ⬜ Deploy to production
+1. ✅ Fix auth flow (login → projects → params)
+2. ✅ Simplify BaseShearPage (remove Fk table + bar charts, keep Robot export)
+3. ✅ Seismic combinations module — §5.2 (standalone page)
+4. ✅ Backend: displacement engine §4.5.2 + §5.10 — `displacements.py` + endpoint
+5. ✅ Backend: P-Δ engine §5.9 — `p_delta.py` + endpoint
+6. ✅ Backend: overturning engine §5.5 — `overturning.py` + endpoint
+7. ⬜ Frontend: SeismicVerificationPage with 4 tabs (Effort V, Déplacements, P-Δ, Renversement)
+8. ✅ Deploy to production — Dockerfile + railway.toml + scripts/start.sh
 
 ### Future Modules (Post-Deploy)
 
@@ -759,7 +761,7 @@ Errors must be descriptive, logged, and user-friendly (in French).
 ### To Implement (MVP)
 - **Combinations (§5.2)**: `G + ψQ ± E`, `E1 = ±Ex ± 0.3Ey`, `E2 = ±0.3Ex ± Ey`
   Vertical component Ez added if `Av·I·g > 0.25g` → E3, E4, E5 (up to 24 combos)
-- **Displacements (§4.5.2)**: `Dk = R × QF × Dek` (Eq 4.15), `Δk = Dk − Dk-1` (Eq 4.16)
+- **Displacements (§4.5.2)**: `δk = (R / QF) × δek` (Eq 4.15), `Δk = δk − δk-1` (Eq 4.16)  ← R/QF not R×QF
 - **Drift check (§5.10)**: `Δk < limits` from Table 5.2 (non-effondrement + limitation de dommages)
 - **P-Δ (§5.9)**: `θk = (Pk × Δk) / (Vk × hk)` (Eq 5.9), `Pk = Σ(Gi + ψQi)` for i≥k (Eq 5.10)
   θk < 0.10 → OK; 0.10–0.20 → amplify by 1/(1−θk); > 0.20 → unstable
@@ -779,10 +781,11 @@ The project follows a "deploy MVP, then iterate" approach:
 
 ### Deployment Target: Railway
 
-- Backend: FastAPI served by uvicorn
-- Frontend: Vite build → static files served by backend or separate service
-- Database: Railway-managed PostgreSQL
-- Environment: all secrets via env vars (DATABASE_URL, JWT_SECRET, etc.)
+- **Single service**: FastAPI serves both the API and the Vite-built frontend
+- Backend: uvicorn (1 worker, `--host 0.0.0.0 --port $PORT`)
+- Frontend: `npm run build` in Docker Stage 1 → `frontend/dist/` served as static files
+- Database: Railway-managed PostgreSQL (URL normalized automatically from `postgres://`)
+- Migrations: `alembic upgrade head` runs inside `scripts/start.sh` before uvicorn
 - Auto-deploy: push to `main` → Railway rebuilds and deploys
 
 ### Pre-Deployment Checklist
@@ -794,10 +797,39 @@ The project follows a "deploy MVP, then iterate" approach:
 - [ ] P-Δ tab complete (§5.9)
 - [ ] Overturning tab complete (§5.5)
 - [ ] SeismicVerificationPage with 4 tabs working
-- [ ] CORS configured for production domain
-- [ ] Environment variables for all secrets
-- [ ] Alembic migrations run on production DB
-- [ ] Build succeeds (`npm run build` + backend starts)
+- [x] CORS configured for production domain (env var `CORS_ORIGINS`)
+- [x] Environment variables for all secrets (see Railway section below)
+- [x] Alembic migrations run on production DB (via `scripts/start.sh`)
+- [x] Build succeeds (`npm run build` + backend starts)
+- [x] Dockerfile multi-stage build (frontend → backend+dist)
+- [x] `railway.toml` configured with health check + restart policy
+
+### Railway Deployment
+
+**Architecture:** Single service — FastAPI serves API + static frontend from `frontend/dist/`.
+
+**Startup chain:**
+```
+Docker build:
+  Stage 1 (node:20-alpine): npm ci → npm run build → frontend/dist/
+  Stage 2 (python:3.12-slim): pip install → copy code + dist
+
+Container start (scripts/start.sh):
+  1. alembic upgrade head   ← creates/migrates tables, exits on failure
+  2. uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+
+Request routing:
+  /api/v1/*    → FastAPI routers (auth, projects, spectrum, etc.)
+  /api/health  → health check
+  /assets/*    → frontend/dist/assets/ (JS, CSS, images)
+  /*           → frontend/dist/index.html (SPA fallback)
+```
+
+**Environment Variables (set in Railway dashboard):**
+- `DATABASE_URL` — auto-linked from Railway PostgreSQL plugin (`postgres://...`, normalized automatically)
+- `JWT_SECRET_KEY` — generate with `openssl rand -hex 32`
+- `CORS_ORIGINS` — `https://YOUR-APP.up.railway.app` (comma-separated if multiple)
+- `ENVIRONMENT` — `production`
 
 ---
 

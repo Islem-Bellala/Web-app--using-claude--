@@ -12,7 +12,8 @@ pydantic-settings==2.2.1  # BaseSettings for config via env vars
 
 # ── Database ───────────────────────────────────────────────────────────────────
 sqlalchemy==2.0.30        # ORM
-psycopg2-binary==2.9.9    # PostgreSQL driver
+asyncpg==0.29.0           # Async PostgreSQL driver (SQLAlchemy async backend)
+psycopg2-binary==2.9.9    # Sync PostgreSQL driver (Alembic migrations)
 alembic==1.13.1           # Database migrations
 
 # ── Engineering / Scientific ──────────────────────────────────────────────────
@@ -31,6 +32,12 @@ python-docx==1.1.0        # Word document generation
 # ── Testing ────────────────────────────────────────────────────────────────────
 pytest==8.2.0             # Test runner
 pytest-cov==5.0.0         # Coverage reports
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+python-jose[cryptography]==3.3.0  # JWT encoding/decoding
+passlib[bcrypt]==1.7.4            # Password hashing
+python-multipart==0.0.9           # Form data parsing (FastAPI auth forms)
+email-validator==2.1.1            # Pydantic EmailStr validation
 
 # ── Development ────────────────────────────────────────────────────────────────
 python-dotenv==1.0.1      # Environment variables (.env file)
