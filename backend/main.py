@@ -1,6 +1,6 @@
 """
-Bunyan — FastAPI Backend Entry Point
-======================================
+Bunyan - FastAPI Backend Entry Point
+====================================
 Run from the project root with:
 
     uvicorn backend.main:app --reload --port 8000
@@ -24,21 +24,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.config import settings
 from backend.api.v1.router import api_router
+from backend.config import settings
 from backend.database import dispose_engine
 
 
 # =============================================================================
-# LIFESPAN — startup / shutdown
+# LIFESPAN - startup / shutdown
 # =============================================================================
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # startup — nothing to do yet (engine connects lazily)
+    # startup - nothing to do yet (engine connects lazily)
     yield
-    # shutdown — release connection pool
+    # shutdown - release connection pool
     await dispose_engine()
 
 
@@ -48,27 +48,27 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     lifespan=lifespan,
-    title       = settings.app_name,
-    description = (
+    title=settings.app_name,
+    description=(
         "Calcul sismique et ferraillage BA selon RPA 2024, CBA93, BAEL91.\n\n"
-        "Backend Python pour Bunyan — plateforme de vérification structurale algérienne."
+        "Backend Python pour Bunyan - plateforme de verification structurale algerienne."
     ),
-    version     = "0.1.0",
-    docs_url    = "/docs",
-    redoc_url   = "/redoc",
+    version="0.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 
 # =============================================================================
-# CORS — Allow React dev server to call this API
+# CORS - Allow React dev server to call this API
 # =============================================================================
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins     = settings.cors_origins,
-    allow_credentials = True,
-    allow_methods     = ["*"],
-    allow_headers     = ["*"],
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -78,7 +78,7 @@ app.add_middleware(
 
 app.include_router(
     api_router,
-    prefix = settings.api_v1_prefix,
+    prefix=settings.api_v1_prefix,
 )
 
 
@@ -86,26 +86,16 @@ app.include_router(
 # HEALTH CHECK
 # =============================================================================
 
-@app.get("/", tags=["Health"])
-def root():
-    """Health check — confirms the backend is running."""
-    return {
-        "status"  : "ok",
-        "app"     : settings.app_name,
-        "version" : "0.1.0",
-        "docs"    : "/docs",
-    }
-
 
 @app.get("/health", tags=["Health"])
 def health():
     """Detailed health check."""
     return {
-        "status"  : "ok",
-        "modules" : {
-            "spectrum"    : "active",
-            "base_shear"  : "active",
-            "annex_a"     : "active",
+        "status": "ok",
+        "modules": {
+            "spectrum": "active",
+            "base_shear": "active",
+            "annex_a": "active",
             "combinations": "pending",
         },
     }
@@ -118,23 +108,40 @@ def api_health():
 
 
 # =============================================================================
-# STATIC FILES — serve the frontend build in production
+# STATIC FILES - serve the frontend build in production
 # Must be registered AFTER all API routes so the catch-all doesn't intercept them.
 # =============================================================================
 
-_frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
 
-if _frontend_dist.exists():
+if frontend_dist.exists():
+    @app.get("/", include_in_schema=False)
+    async def serve_root():
+        """Serve the SPA entrypoint at the site root."""
+        return FileResponse(frontend_dist / "index.html")
+
+
     app.mount(
         "/assets",
-        StaticFiles(directory=_frontend_dist / "assets"),
+        StaticFiles(directory=frontend_dist / "assets"),
         name="assets",
     )
 
+
     @app.get("/{path:path}", include_in_schema=False)
     async def spa_fallback(path: str):
-        """SPA fallback — serve index.html for any non-API route."""
-        file_path = _frontend_dist / path
+        """SPA fallback - serve index.html for any non-API route."""
+        file_path = frontend_dist / path
         if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
-        return FileResponse(_frontend_dist / "index.html")
+        return FileResponse(frontend_dist / "index.html")
+else:
+    @app.get("/", tags=["Health"])
+    def root():
+        """Health check - confirms the backend is running."""
+        return {
+            "status": "ok",
+            "app": settings.app_name,
+            "version": "0.1.0",
+            "docs": "/docs",
+        }
