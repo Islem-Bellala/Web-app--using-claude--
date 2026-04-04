@@ -36,6 +36,7 @@ pytest-cov==5.0.0         # Coverage reports
 # ── Auth ──────────────────────────────────────────────────────────────────────
 python-jose[cryptography]==3.3.0  # JWT encoding/decoding
 passlib[bcrypt]==1.7.4            # Password hashing
+bcrypt==4.0.1                     # Pinned for passlib 1.7.4 compatibility
 python-multipart==0.0.9           # Form data parsing (FastAPI auth forms)
 email-validator==2.1.1            # Pydantic EmailStr validation
 

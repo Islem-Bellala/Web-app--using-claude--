@@ -5,12 +5,12 @@ Bunyan — Auth Schemas (Pydantic)
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., max_length=72)
     full_name: str | None = None
 
 
