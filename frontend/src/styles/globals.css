@@ -1,73 +1,42 @@
-/* ── Google Fonts ────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+Arabic:wght@400;700&display=swap');
 
 @import "tailwindcss";
 
-/* ── Dark mode via .dark class on <html> ─────────────────────────────────── */
 @variant dark (&:where(.dark, .dark *));
 
-/* ── Bunyan theme tokens ─────────────────────────────────────────────────── */
 @theme {
-  /* Fonts */
   --font-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Consolas', monospace;
   --font-arabic: 'Noto Sans Arabic', 'IBM Plex Sans', sans-serif;
-
-  /* Surfaces — light */
-  --color-bunyan-bg:      #f8fafc;
-  --color-bunyan-surface: #ffffff;
-  --color-bunyan-elevated:#f1f5f9;
-
-  /* Surfaces — dark */
-  --color-bunyan-dark-bg:       #020817;
-  --color-bunyan-dark-surface:  #0a1628;
-  --color-bunyan-dark-elevated: #0f172a;
-
-  /* Borders — light */
-  --color-bunyan-border:       #e2e8f0;
-  --color-bunyan-border-light: #cbd5e1;
-
-  /* Borders — dark */
-  --color-bunyan-dark-border:       #1e293b;
-  --color-bunyan-dark-border-light: #475569;
-
-  /* Text — light */
-  --color-bunyan-text:       #0f172a;
-  --color-bunyan-text-sec:   #475569;
-  --color-bunyan-text-muted: #94a3b8;
-
-  /* Text — dark */
-  --color-bunyan-dark-text:       #f1f5f9;
-  --color-bunyan-dark-text-sec:   #cbd5e1;
-  --color-bunyan-dark-text-muted: #94a3b8;
-
-  /* Accent — light */
-  --color-bunyan-blue:   #2563eb;
-  --color-bunyan-green:  #059669;
-  --color-bunyan-amber:  #d97706;
-  --color-bunyan-red:    #dc2626;
-  --color-bunyan-purple: #7c3aed;
-
-  /* Accent — dark */
-  --color-bunyan-dark-blue:   #60a5fa;
-  --color-bunyan-dark-green:  #34d399;
-  --color-bunyan-dark-amber:  #fbbf24;
-  --color-bunyan-dark-red:    #f87171;
-  --color-bunyan-dark-purple: #c4b5fd;
 }
 
-/* ── Component utilities ─────────────────────────────────────────────────── */
 @layer utilities {
   .font-arabic {
     font-family: 'Noto Sans Arabic', 'IBM Plex Sans', sans-serif;
   }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .mono {
+    font-family: 'IBM Plex Mono', 'Consolas', monospace;
+  }
 }
 
-/* ── Base styles ─────────────────────────────────────────────────────────── */
 @layer base {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     box-sizing: border-box;
-    margin: 0;
-    padding: 0;
   }
 
   html {
@@ -75,19 +44,25 @@
     overflow: hidden;
     font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
     font-size: 14px;
-    line-height: 1.6;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
-    background-color: #f8fafc;
-    color: #0f172a;
+    text-rendering: optimizeLegibility;
+    background:
+      radial-gradient(circle at top, rgba(37, 99, 235, 0.14), transparent 35%),
+      #f3f7fb;
+    color: #08111d;
   }
 
   html.dark {
-    background-color: #020817;
-    color: #f1f5f9;
+    background:
+      radial-gradient(circle at top, rgba(59, 130, 246, 0.16), transparent 28%),
+      #06111d;
+    color: #eff5ff;
   }
 
   body {
     height: 100%;
+    margin: 0;
     overflow: hidden;
   }
 
@@ -96,16 +71,79 @@
     overflow: hidden;
   }
 
-  select {
+  body,
+  button,
+  input,
+  select,
+  textarea {
     font-family: inherit;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button {
+    border: 0;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  a:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: rgba(37, 99, 235, 0.18);
   }
 }
 
-/* ── Scrollbars ──────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
-html.dark ::-webkit-scrollbar-thumb { background: #1e293b; }
-html.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(107, 124, 147, 0.45);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 124, 147, 0.68);
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(71, 97, 128, 0.72);
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(113, 141, 175, 0.78);
+}

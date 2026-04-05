@@ -1,18 +1,10 @@
-/**
- * Bunyan — Seismic Verification Page (RPA 2024)
- * 4 horizontal tabs:
- *   1. Effort V       — base shear (embeds BaseShearPage)
- *   2. Déplacements   — §4.5.2 + §5.10 displacement check
- *   3. P-Δ            — §5.9 stability index
- *   4. Renversement   — §5.5 overturning + sliding
- */
-
 import { useState } from 'react'
 import type { AppColors } from '../../types'
 import BaseShearPage from './BaseShearPage'
 import DisplacementsTab from './DisplacementsTab'
 import PDeltaTab from './PDeltaTab'
 import OverturningTab from './OverturningTab'
+import { BadgeStrip, PageHero, PageShell } from '../shared/PageChrome'
 
 interface Props {
   c: AppColors
@@ -21,94 +13,53 @@ interface Props {
 
 type Tab = 'effort-v' | 'deplacements' | 'p-delta' | 'renversement'
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'effort-v',      label: 'Effort V'       },
-  { id: 'deplacements',  label: 'Déplacements'   },
-  { id: 'p-delta',       label: 'P-Δ'            },
-  { id: 'renversement',  label: 'Renversement'   },
+const TABS: { id: Tab; label: string; description: string }[] = [
+  { id: 'effort-v', label: 'Effort V', description: 'Effort tranchant à la base' },
+  { id: 'deplacements', label: 'Déplacements', description: 'Contrôle inter-étages et dérives' },
+  { id: 'p-delta', label: 'P-delta', description: 'Indice de stabilité et amplification' },
+  { id: 'renversement', label: 'Renversement', description: 'Stabilité au renversement et glissement' },
 ]
 
 export default function SeismicVerificationPage({ c, isDark }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('effort-v')
+  const active = TABS.find((tab) => tab.id === activeTab) ?? TABS[0]
 
   return (
-    <div style={{
-      height: '100%', display: 'flex', flexDirection: 'column',
-      background: c.bg, overflow: 'hidden',
-      fontFamily: "'IBM Plex Sans','Segoe UI',sans-serif",
-    }}>
-      {/* Page header */}
-      <div style={{ padding: '16px 16px 0', flexShrink: 0 }}>
-        <div style={{ fontSize: 12, letterSpacing: '0.12em', color: c.blue,
-          textTransform: 'uppercase', marginBottom: 4, fontWeight: 600 }}>
-          BUNYAN — VÉRIFICATIONS SISMIQUES
-        </div>
-        <h1 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 12px', color: c.text }}>
-          Vérification sismique — RPA 2024
-        </h1>
+    <PageShell c={c} className="page-shell--tight">
+      <PageHero
+        eyebrow="Vérifications sismiques"
+        title="Contrôles RPA 2024"
+        description="Passez d’un contrôle à l’autre dans un flux continu, avec le même niveau de lisibilité pour les entrées, les états et les verdicts."
+        aside={<>Module actif : <strong>{active.label}</strong><br />{active.description}</>}
+      />
 
-        {/* Tab bar */}
-        <div style={{
-          display: 'flex', gap: 0,
-          borderBottom: `1px solid ${c.border}`,
-        }}>
-          {TABS.map(tab => {
-            const isActive = tab.id === activeTab
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  padding: '10px 20px',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: isActive ? `2px solid ${c.blue}` : '2px solid transparent',
-                  color: isActive ? c.blue : c.textSec,
-                  fontWeight: isActive ? 700 : 400,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  letterSpacing: '0.02em',
-                  marginBottom: -1,
-                  transition: 'color 0.15s, border-color 0.15s',
-                }}
-                onMouseEnter={e => {
-                  if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = c.text
-                }}
-                onMouseLeave={e => {
-                  if (!isActive) (e.currentTarget as HTMLButtonElement).style.color = c.textSec
-                }}
-              >
-                {tab.label}
-              </button>
-            )
-          })}
-        </div>
+      <BadgeStrip
+        items={[
+          { label: 'Contrôles', value: '4 modules', color: c.blue },
+          { label: 'Cadre', value: 'RPA 2024', color: c.green },
+          { label: 'Vue active', value: active.label, color: c.purple },
+        ]}
+      />
+
+      <div className="verification-tabs" style={{ ...({ '--page-blue': c.blue } as React.CSSProperties), marginBottom: 16 }}>
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`verification-tab ${tab.id === activeTab ? 'is-active' : ''}`.trim()}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Tab content — scrolls independently */}
-      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
-        {activeTab === 'effort-v' && (
-          <div style={{ height: '100%', overflow: 'hidden' }}>
-            <BaseShearPage c={c} />
-          </div>
-        )}
-        {activeTab === 'deplacements' && (
-          <div style={{ height: '100%', overflowY: 'auto' }}>
-            <DisplacementsTab c={c} isDark={isDark} />
-          </div>
-        )}
-        {activeTab === 'p-delta' && (
-          <div style={{ height: '100%', overflowY: 'auto' }}>
-            <PDeltaTab c={c} isDark={isDark} />
-          </div>
-        )}
-        {activeTab === 'renversement' && (
-          <div style={{ height: '100%', overflowY: 'auto' }}>
-            <OverturningTab c={c} isDark={isDark} />
-          </div>
-        )}
+      <div style={{ minHeight: 0 }}>
+        {activeTab === 'effort-v' ? <BaseShearPage c={c} /> : null}
+        {activeTab === 'deplacements' ? <DisplacementsTab c={c} isDark={isDark} /> : null}
+        {activeTab === 'p-delta' ? <PDeltaTab c={c} isDark={isDark} /> : null}
+        {activeTab === 'renversement' ? <OverturningTab c={c} isDark={isDark} /> : null}
       </div>
-    </div>
+    </PageShell>
   )
 }

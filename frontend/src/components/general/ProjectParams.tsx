@@ -6,7 +6,7 @@ import { useProjectStore, useSeismicStore, useStructuralStore } from '../../stor
 import './ProjectParams.css'
 
 const ZONE_LABELS: Record<string, string> = {
-  '0': 'Zone 0 - Tres faible',
+  '0': 'Zone 0 - Très faible',
   I: 'Zone I (0.07g)',
   II: 'Zone II (0.10g)',
   III: 'Zone III (0.15g)',
@@ -25,7 +25,7 @@ const FRAME_SYSTEMS: FrameSystem[] = [
   { v: 'ba_no_infill', l: 'Ossature BA sans remplissage', ct: 'CT=0.075' },
   { v: 'steel_no_infill', l: 'Ossature acier sans remplissage', ct: 'CT=0.085' },
   { v: 'ba_with_infill', l: 'Ossature BA/acier avec remplissage', ct: 'CT=0.050' },
-  { v: 'other', l: 'Autres systemes', ct: 'CT=0.050' },
+  { v: 'other', l: 'Autres systèmes', ct: 'CT=0.050' },
 ]
 
 type ProjectStoreState = ReturnType<typeof useProjectStore>
@@ -54,20 +54,20 @@ function formatMetric(value: string | number, unit: string, digits = 2) {
 
 function CardShell({
   c,
+  order,
   title,
-  kicker,
-  description,
   accent,
+  description,
   statusLabel,
   statusTone,
   className,
   children,
 }: {
   c: AppColors
+  order: string
   title: string
-  kicker: string
-  description: string
   accent: string
+  description: string
   statusLabel: string
   statusTone: StatusTone
   className?: string
@@ -77,10 +77,9 @@ function CardShell({
     <section className={joinClasses('pp-card', className)}>
       <div className="pp-card-header">
         <div className="pp-card-heading">
-          <div className="pp-card-kicker" style={{ color: accent }}>
-            {kicker}
-          </div>
-          <h2 className="pp-card-title">{title}</h2>
+          <h2 className="pp-card-title" style={{ color: accent }}>
+            {order} - {title}
+          </h2>
           <p className="pp-card-description">{description}</p>
         </div>
         <StatusBadge c={c} tone={statusTone}>
@@ -122,10 +121,20 @@ function StatusBadge({
   )
 }
 
-function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+function SectionTitle({
+  title,
+  subtitle,
+  accent,
+}: {
+  title: string
+  subtitle?: string
+  accent?: string
+}) {
   return (
     <div className="pp-section-title-wrap">
-      <div className="pp-section-title">{title}</div>
+      <div className="pp-section-title" style={accent ? { color: accent } : undefined}>
+        {title}
+      </div>
       {subtitle && <div className="pp-section-subtitle">{subtitle}</div>}
     </div>
   )
@@ -227,17 +236,7 @@ function ActionTrigger({
 function PageHeader() {
   return (
     <header className="pp-header">
-      <div>
-        <div className="pp-eyebrow">Bunyan - Parametres</div>
-        <h1 className="pp-page-title">Parametres generaux</h1>
-        <p className="pp-page-subtitle">
-          Point d&apos;entree unique pour les donnees de projet, les coefficients sismiques et les
-          resultats d&apos;analyse dynamique.
-        </p>
-      </div>
-      <div className="pp-header-note">
-        Ces valeurs alimentent le spectre, les combinaisons et la verification sismique.
-      </div>
+      <div className="pp-header-title">Bunyan - Paramètres</div>
     </header>
   )
 }
@@ -266,8 +265,8 @@ function SummaryStrip({
     { label: 'Site', value: site || '—', helper: 'Classe de site', accent: c.green },
     { label: 'Groupe', value: group || '—', helper: 'Importance du projet', accent: c.amber },
     { label: 'Mode', value: analysisMode, helper: 'Spectre de calcul', accent: c.purple },
-    { label: 'Niveaux', value: String(storyCount), helper: 'Niveaux modelises', accent: c.blue },
-    { label: 'W total', value: `${totalW.toFixed(0)} kN`, helper: 'Poids cumule', accent: c.green },
+    { label: 'Niveaux', value: String(storyCount), helper: 'Niveaux modélisés', accent: c.blue },
+    { label: 'W total', value: `${totalW.toFixed(0)} kN`, helper: 'Poids cumulé', accent: c.green },
     { label: 'h_n', value: `${hn.toFixed(1)} m`, helper: 'Hauteur totale', accent: c.purple },
   ]
 
@@ -288,60 +287,22 @@ function SummaryStrip({
   )
 }
 
-function IdentificationCard({
-  c,
-  project,
-  completedCount,
-}: {
-  c: AppColors
-  project: ProjectStoreState
-  completedCount: number
-}) {
-  const statusLabel = completedCount > 0 ? `${completedCount}/3 renseignes` : 'Facultatif'
-  const statusTone: StatusTone = completedCount > 0 ? 'complete' : 'optional'
+function ProjectContextStrip({ c, project }: { c: AppColors; project: ProjectStoreState }) {
+  const items = [
+    { label: 'Projet', value: project.projectName || project.currentProjectName || '—', accent: c.blue },
+    { label: 'Ingénieur', value: project.engineer || '—', accent: c.green },
+    { label: 'Réf', value: project.reference || '—', accent: c.purple },
+  ]
 
   return (
-    <CardShell
-      c={c}
-      title="Identification"
-      kicker="1 - Informations projet"
-      description="Bloc secondaire. Les champs vides restent utilisables grace aux valeurs generees automatiquement."
-      accent={c.textMuted}
-      statusLabel={statusLabel}
-      statusTone={statusTone}
-      className="pp-identification-card"
-    >
-      <div className="pp-note pp-note--neutral">
-        Nom du projet, ingenieur et reference sont optionnels. La date reste affichee telle quelle.
-      </div>
-
-      <div className="pp-card-stack">
-        <Field label="Nom du projet">
-          <TextInput
-            value={project.projectName}
-            onChange={(value) => project.setProjectMeta({ projectName: value })}
-            placeholder={`Projet_${project.date}`}
-          />
-        </Field>
-        <Field label="Ingenieur">
-          <TextInput
-            value={project.engineer}
-            onChange={(value) => project.setProjectMeta({ engineer: value })}
-            placeholder="Nom de l'ingenieur"
-          />
-        </Field>
-        <Field label="Reference">
-          <TextInput
-            value={project.reference}
-            onChange={(value) => project.setProjectMeta({ reference: value })}
-            placeholder="Ref. dossier"
-          />
-        </Field>
-        <Field label="Date">
-          <div className="pp-static-value">{project.date}</div>
-        </Field>
-      </div>
-    </CardShell>
+    <section className="pp-context-strip">
+      {items.map((item) => (
+        <div key={item.label} className="pp-context-item" style={{ borderTopColor: item.accent }}>
+          <div className="pp-context-label">{item.label}</div>
+          <div className="pp-context-value">{item.value}</div>
+        </div>
+      ))}
+    </section>
   )
 }
 
@@ -371,10 +332,10 @@ function SeismicCard({
   return (
     <CardShell
       c={c}
+      order="1"
       title="Parametres sismiques"
-      kicker="2 - Pilotage RPA 2024"
-      description="Zone, classification, coefficients de comportement et geometrie en plan regroupes dans un bloc principal."
       accent={c.blue}
+      description="Zone, classification, coefficients de comportement et geometrie en plan regroupes dans un bloc principal."
       statusLabel={seismicReady ? 'Complet' : 'A verifier'}
       statusTone={seismicReady ? 'complete' : 'attention'}
       className="pp-seismic-card"
@@ -729,54 +690,94 @@ function SeismicCard({
 function GeometryMassesCard({
   c,
   project,
+  seismic,
   structural,
   totalW,
   hn,
   storyCount,
   filledStoryCount,
   geometryReady,
+  dynamicReady,
+  missingDynamic,
 }: {
   c: AppColors
   project: ProjectStoreState
+  seismic: SeismicStoreState
   structural: StructuralStoreState
   totalW: number
   hn: number
   storyCount: number
   filledStoryCount: number
   geometryReady: boolean
+  dynamicReady: boolean
+  missingDynamic: string[]
 }) {
+  const metrics = [
+    {
+      label: 'Periode Tx (s)',
+      value: seismic.Tx,
+      display: formatMetric(seismic.Tx, 's', 2),
+      accent: c.blue,
+      onChange: (next: string) => seismic.setField('Tx', next),
+    },
+    {
+      label: 'Periode Ty (s)',
+      value: seismic.Ty,
+      display: formatMetric(seismic.Ty, 's', 2),
+      accent: c.purple,
+      onChange: (next: string) => seismic.setField('Ty', next),
+    },
+    {
+      label: 'Effort dyn. Vxd (kN)',
+      value: seismic.Vxd,
+      display: formatMetric(seismic.Vxd, 'kN', 0),
+      accent: c.blue,
+      onChange: (next: string) => seismic.setField('Vxd', next),
+    },
+    {
+      label: 'Effort dyn. Vyd (kN)',
+      value: seismic.Vyd,
+      display: formatMetric(seismic.Vyd, 'kN', 0),
+      accent: c.purple,
+      onChange: (next: string) => seismic.setField('Vyd', next),
+    },
+  ]
+
+  const storyTableColumns = 'minmax(136px, 1.85fr) 64px 82px 82px 82px 30px'
+  const cardReady = geometryReady && dynamicReady
+  const statusLabel = cardReady
+    ? 'Complet'
+    : geometryReady
+      ? 'Saisie dynamique partielle'
+      : `${filledStoryCount}/${storyCount} lignes completes`
+
   return (
     <CardShell
       c={c}
+      order="2"
       title="Geometrie et masses"
-      kicker="3 - Niveaux"
-      description="Table de niveaux, hauteurs et poids utilises dans les verifications sismiques."
       accent={c.green}
-      statusLabel={geometryReady ? 'Complet' : `${filledStoryCount}/${storyCount} lignes completes`}
-      statusTone={geometryReady ? 'complete' : 'attention'}
+      description="Table de niveaux, hauteurs, poids et deplacements elastiques utilises dans les verifications sismiques."
+      statusLabel={statusLabel}
+      statusTone={cardReady ? 'complete' : 'attention'}
       className="pp-geometry-card"
     >
       <div className="pp-note pp-note--neutral">
-        Les valeurs de hauteur et de poids sont lues directement par les modules de calcul.
+        Les valeurs de hauteur, de poids et de deplacement elastique sont lues directement par les modules de calcul.
       </div>
 
       <div className="pp-table-shell pp-table-shell--stories">
-        <div
-          className="pp-table-header"
-          style={{ gridTemplateColumns: 'minmax(160px, 1.5fr) 92px 110px 40px' }}
-        >
+        <div className="pp-table-header" style={{ gridTemplateColumns: storyTableColumns }}>
           <div>Niveau</div>
           <div>h (m)</div>
           <div>W (kN)</div>
+          <div>δek,x (cm)</div>
+          <div>δek,y (cm)</div>
           <div />
         </div>
         <div className="pp-table-scroll">
           {structural.stories.map((story) => (
-            <div
-              key={story.id}
-              className="pp-table-row"
-              style={{ gridTemplateColumns: 'minmax(160px, 1.5fr) 92px 110px 40px' }}
-            >
+            <div key={story.id} className="pp-table-row" style={{ gridTemplateColumns: storyTableColumns }}>
               <input
                 value={story.name}
                 placeholder="Niveau"
@@ -799,6 +800,26 @@ function GeometryMassesCard({
                 className="pp-input pp-input--numeric"
                 style={{ color: c.green }}
               />
+              <input
+                type="number"
+                value={story.dek_x || ''}
+                min={0}
+                step="0.01"
+                placeholder="—"
+                onChange={(event) => structural.updateStory(story.id, 'dek_x', event.target.value)}
+                className="pp-input pp-input--numeric"
+                style={{ color: c.blue }}
+              />
+              <input
+                type="number"
+                value={story.dek_y || ''}
+                min={0}
+                step="0.01"
+                placeholder="—"
+                onChange={(event) => structural.updateStory(story.id, 'dek_y', event.target.value)}
+                className="pp-input pp-input--numeric"
+                style={{ color: c.purple }}
+              />
               <button
                 type="button"
                 onClick={() => structural.removeStory(story.id)}
@@ -813,29 +834,66 @@ function GeometryMassesCard({
         </div>
       </div>
 
-      <div className="pp-actions-row">
-        <button type="button" onClick={() => structural.addStory()} className="pp-primary-button">
-          + Ajouter un niveau
-        </button>
-        <div className="pp-inline-note" style={{ color: c.textMuted }}>
-          {project.lx > 0 || project.ly > 0
-            ? `Plan saisi: ${project.lx || 0} m x ${project.ly || 0} m`
-            : 'Plan non saisi'}
+      <div className="pp-card-section">
+        <div className="pp-actions-row">
+          <button type="button" onClick={() => structural.addStory()} className="pp-primary-button">
+            + Ajouter un niveau
+          </button>
+          <div className="pp-inline-note" style={{ color: c.textMuted }}>
+            {project.lx > 0 || project.ly > 0
+              ? `Plan saisi: ${project.lx || 0} m x ${project.ly || 0} m`
+              : 'Plan non saisi'}
+          </div>
+        </div>
+
+        <div className="pp-totals-grid">
+          <div className="pp-total-card">
+            <div className="pp-total-label">Poids total W</div>
+            <div className="pp-total-value" style={{ color: c.green }}>
+              {totalW.toFixed(0)} kN
+            </div>
+          </div>
+          <div className="pp-total-card">
+            <div className="pp-total-label">Hauteur totale h_n</div>
+            <div className="pp-total-value" style={{ color: c.purple }}>
+              {hn.toFixed(1)} m
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="pp-totals-grid">
-        <div className="pp-total-card">
-          <div className="pp-total-label">Poids total W</div>
-          <div className="pp-total-value" style={{ color: c.green }}>
-            {totalW.toFixed(0)} kN
-          </div>
+      <div className="pp-card-section">
+        <SectionTitle
+          title="3 - Resultats analyse dynamique"
+          subtitle="Periodes et efforts dynamiques importes ou saisis manuellement."
+          accent={c.amber}
+        />
+
+        <div className="pp-import-banner">
+          <div className="pp-import-dot" />
+          <span className="pp-import-copy">Robot / ETABS non connecte - saisie manuelle</span>
+          <button type="button" className="pp-disabled-button" disabled>
+            Importer
+          </button>
         </div>
-        <div className="pp-total-card">
-          <div className="pp-total-label">Hauteur totale h_n</div>
-          <div className="pp-total-value" style={{ color: c.purple }}>
-            {hn.toFixed(1)} m
-          </div>
+
+        <div className={joinClasses('pp-note', dynamicReady ? 'pp-note--positive' : 'pp-note--warning')}>
+          {dynamicReady
+            ? 'Les periodes, efforts et deplacements requis sont renseignes pour la verification en cours.'
+            : `A completer: ${missingDynamic.join(', ')}.`}
+        </div>
+
+        <div className="pp-metrics-grid" style={{ marginTop: '14px' }}>
+          {metrics.map((metric) => (
+            <MetricInputCard
+              key={metric.label}
+              accent={metric.accent}
+              label={metric.label}
+              value={metric.value}
+              display={metric.display}
+              onChange={metric.onChange}
+            />
+          ))}
         </div>
       </div>
     </CardShell>
@@ -879,144 +937,6 @@ function MetricInputCard({
         className="pp-input pp-input--numeric"
       />
     </div>
-  )
-}
-
-function DynamicResultsCard({
-  c,
-  seismic,
-  structural,
-  dynamicReady,
-  missingDynamic,
-}: {
-  c: AppColors
-  seismic: SeismicStoreState
-  structural: StructuralStoreState
-  dynamicReady: boolean
-  missingDynamic: string[]
-}) {
-  const metrics = [
-    {
-      label: 'Periode Tx (s)',
-      value: seismic.Tx,
-      display: formatMetric(seismic.Tx, 's', 2),
-      accent: c.blue,
-      onChange: (next: string) => seismic.setField('Tx', next),
-    },
-    {
-      label: 'Periode Ty (s)',
-      value: seismic.Ty,
-      display: formatMetric(seismic.Ty, 's', 2),
-      accent: c.purple,
-      onChange: (next: string) => seismic.setField('Ty', next),
-    },
-    {
-      label: 'Effort dyn. Vxd (kN)',
-      value: seismic.Vxd,
-      display: formatMetric(seismic.Vxd, 'kN', 0),
-      accent: c.blue,
-      onChange: (next: string) => seismic.setField('Vxd', next),
-    },
-    {
-      label: 'Effort dyn. Vyd (kN)',
-      value: seismic.Vyd,
-      display: formatMetric(seismic.Vyd, 'kN', 0),
-      accent: c.purple,
-      onChange: (next: string) => seismic.setField('Vyd', next),
-    },
-  ]
-
-  return (
-    <CardShell
-      c={c}
-      title="Resultats analyse dynamique"
-      kicker="4 - Saisie etat modal"
-      description="Periodes, efforts dynamiques et deplacements elastiques importes ou saisis manuellement."
-      accent={c.amber}
-      statusLabel={dynamicReady ? 'Pret pour verification' : 'Saisie partielle'}
-      statusTone={dynamicReady ? 'complete' : 'attention'}
-      className="pp-results-card"
-    >
-      <div className="pp-import-banner">
-        <div className="pp-import-dot" />
-        <span className="pp-import-copy">Robot / ETABS non connecte - saisie manuelle</span>
-        <button type="button" className="pp-disabled-button" disabled>
-          Importer
-        </button>
-      </div>
-
-      <div className={joinClasses('pp-note', dynamicReady ? 'pp-note--positive' : 'pp-note--warning')}>
-        {dynamicReady
-          ? 'Les periodes, efforts et deplacements requis sont renseignes pour la verification en cours.'
-          : `A completer: ${missingDynamic.join(', ')}.`}
-      </div>
-
-      <div className="pp-results-body">
-        <div className="pp-results-left">
-          <SectionTitle title="Metriques principales" subtitle="Valeurs saisies en entree d'analyse dynamique." />
-          <div className="pp-metrics-grid">
-            {metrics.map((metric) => (
-              <MetricInputCard
-                key={metric.label}
-                accent={metric.accent}
-                label={metric.label}
-                value={metric.value}
-                display={metric.display}
-                onChange={metric.onChange}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="pp-results-right">
-          <SectionTitle
-            title="Deplacements elastiques δek (cm)"
-            subtitle="Une ligne par niveau, avec alignement numerique et en-tete fixe."
-          />
-          <div className="pp-table-shell pp-table-shell--displacements">
-            <div
-              className="pp-table-header"
-              style={{ gridTemplateColumns: 'minmax(160px, 1.4fr) 120px 120px' }}
-            >
-              <div>Niveau</div>
-              <div>δek,x (cm)</div>
-              <div>δek,y (cm)</div>
-            </div>
-            <div className="pp-table-scroll pp-table-scroll--tall">
-              {structural.stories.map((story) => (
-                <div
-                  key={story.id}
-                  className="pp-table-row"
-                  style={{ gridTemplateColumns: 'minmax(160px, 1.4fr) 120px 120px' }}
-                >
-                  <div className="pp-row-title">{story.name}</div>
-                  <input
-                    type="number"
-                    value={story.dek_x || ''}
-                    min={0}
-                    step="0.01"
-                    placeholder="—"
-                    onChange={(event) => structural.updateStory(story.id, 'dek_x', event.target.value)}
-                    className="pp-input pp-input--numeric"
-                    style={{ color: c.blue }}
-                  />
-                  <input
-                    type="number"
-                    value={story.dek_y || ''}
-                    min={0}
-                    step="0.01"
-                    placeholder="—"
-                    onChange={(event) => structural.updateStory(story.id, 'dek_y', event.target.value)}
-                    className="pp-input pp-input--numeric"
-                    style={{ color: c.purple }}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </CardShell>
   )
 }
 
@@ -1069,9 +989,6 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
   const storyCount = structural.stories.length
   const filledStoryCount = structural.stories.filter(
     (story) => story.name.trim() && story.elevation !== '' && story.weight !== '',
-  ).length
-  const identificationCount = [project.projectName, project.engineer, project.reference].filter(
-    (value) => value.trim() !== '',
   ).length
   const hasPlanGeometry = project.lx > 0 && project.ly > 0
   const seismicReady =
@@ -1142,19 +1059,9 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
 
       <PageHeader />
 
-      <SummaryStrip
-        c={c}
-        zoneLabel={zoneLabel}
-        site={project.site}
-        group={project.group}
-        analysisMode={analysisMode}
-        storyCount={storyCount}
-        totalW={totalW}
-        hn={hn}
-      />
+      <ProjectContextStrip c={c} project={project} />
 
       <div className="pp-dashboard-row">
-        <IdentificationCard c={c} project={project} completedCount={identificationCount} />
         <SeismicCard
           c={c}
           project={project}
@@ -1170,22 +1077,17 @@ export default function ProjectParams({ c }: ProjectParamsProps) {
         <GeometryMassesCard
           c={c}
           project={project}
+          seismic={seismic}
           structural={structural}
           totalW={totalW}
           hn={hn}
           storyCount={storyCount}
           filledStoryCount={filledStoryCount}
           geometryReady={geometryReady}
+          dynamicReady={dynamicReady}
+          missingDynamic={missingDynamic}
         />
       </div>
-
-      <DynamicResultsCard
-        c={c}
-        seismic={seismic}
-        structural={structural}
-        dynamicReady={dynamicReady}
-        missingDynamic={missingDynamic}
-      />
     </div>
   )
 }
