@@ -1,87 +1,70 @@
-/**
- * Bunyan — Combinaisons Sismiques
- * RPA 2024 §5.2 — Eq. 5.1–5.4
- *
- * Auto-calculates on input changes.
- * 8 combinations (E1+E2) or 24 combinations (E3+E4+E5) depending on Av·I.
- */
-
-import { useState, useEffect, useRef } from "react"
-import type { AppColors, CombinationsResponse, CombinationOut } from "../../types"
-import { useProjectStore } from "../../stores"
-import { computeCombinations } from "../../services/api"
-
-// ── Row component ─────────────────────────────────────────────────────────────
+import { useEffect, useRef, useState } from 'react'
+import type { AppColors, CombinationsResponse, CombinationOut } from '../../types'
+import { useProjectStore } from '../../stores'
+import { computeCombinations } from '../../services/api'
+import { BadgeStrip, PageHero, PageShell, StateBanner, SurfacePanel } from '../shared/PageChrome'
 
 interface ComboRowProps {
-  combo: CombinationOut;
-  idx: number;
-  c: AppColors;
+  combo: CombinationOut
+  idx: number
+  c: AppColors
 }
 
 function ComboRow({ combo, idx, c }: ComboRowProps) {
-  const isE1E2 = combo.seismic_id === "E1" || combo.seismic_id === "E2"
-  const rowBg = isE1E2 ? c.blue + "0d" : c.purple + "0d"
-  const idColor = isE1E2 ? c.blue : c.purple
+  const isHorizontal = combo.seismic_id === 'E1' || combo.seismic_id === 'E2'
+  const color = isHorizontal ? c.blue : c.purple
 
-  function fmtCoeff(v: number): string {
-    if (v === 0) return "—"
-    return v > 0 ? `+${v.toFixed(1)}` : v.toFixed(1)
+  function formatCoeff(value: number) {
+    if (value === 0) return '—'
+    return value > 0 ? `+${value.toFixed(1)}` : value.toFixed(1)
   }
 
   return (
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: "32px 56px 1fr 52px 52px 52px",
-      gap: 6,
-      alignItems: "center",
-      padding: "7px 10px",
-      borderRadius: 6,
-      background: rowBg,
-      border: `1px solid ${isE1E2 ? c.blue : c.purple}22`,
-    }}>
-      <div style={{ fontSize: 11, color: c.textMuted, fontFamily: "monospace", textAlign: "right" }}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '36px 60px minmax(220px, 1fr) 56px 56px 56px',
+        gap: 8,
+        alignItems: 'center',
+        padding: '10px 12px',
+        borderRadius: 14,
+        border: `1px solid ${color}22`,
+        background: `${color}10`,
+      }}
+    >
+      <div style={{ fontSize: 11, color: c.textMuted, fontFamily: 'IBM Plex Mono, monospace', textAlign: 'right' }}>
         {idx + 1}
       </div>
-      <div style={{
-        fontSize: 11, fontWeight: 700, color: idColor,
-        fontFamily: "monospace", textAlign: "center",
-        background: idColor + "18", borderRadius: 4, padding: "2px 5px",
-      }}>
+      <div
+        style={{
+          padding: '5px 8px',
+          borderRadius: 999,
+          background: `${color}18`,
+          color,
+          fontSize: 11,
+          fontWeight: 700,
+          textAlign: 'center',
+          fontFamily: 'IBM Plex Mono, monospace',
+        }}
+      >
         {combo.id}
       </div>
-      <div style={{ fontSize: 11, color: c.text, fontFamily: "'IBM Plex Mono', monospace" }}>
-        {combo.label}
+      <div style={{ fontSize: 12, color: c.text, fontFamily: 'IBM Plex Mono, monospace' }}>{combo.label}</div>
+      <div style={{ textAlign: 'center', color: combo.ex_coeff !== 0 ? c.blue : c.textMuted, fontFamily: 'IBM Plex Mono, monospace' }}>
+        {formatCoeff(combo.ex_coeff)}
       </div>
-      <div style={{
-        fontSize: 11, fontFamily: "monospace", textAlign: "center",
-        color: combo.ex_coeff !== 0 ? c.blue : c.textMuted,
-        fontWeight: combo.ex_coeff !== 0 ? 700 : 400,
-      }}>
-        {fmtCoeff(combo.ex_coeff)}
+      <div style={{ textAlign: 'center', color: combo.ey_coeff !== 0 ? c.purple : c.textMuted, fontFamily: 'IBM Plex Mono, monospace' }}>
+        {formatCoeff(combo.ey_coeff)}
       </div>
-      <div style={{
-        fontSize: 11, fontFamily: "monospace", textAlign: "center",
-        color: combo.ey_coeff !== 0 ? c.purple : c.textMuted,
-        fontWeight: combo.ey_coeff !== 0 ? 700 : 400,
-      }}>
-        {fmtCoeff(combo.ey_coeff)}
-      </div>
-      <div style={{
-        fontSize: 11, fontFamily: "monospace", textAlign: "center",
-        color: combo.ez_coeff !== 0 ? c.amber : c.textMuted,
-        fontWeight: combo.ez_coeff !== 0 ? 700 : 400,
-      }}>
-        {fmtCoeff(combo.ez_coeff)}
+      <div style={{ textAlign: 'center', color: combo.ez_coeff !== 0 ? c.amber : c.textMuted, fontFamily: 'IBM Plex Mono, monospace' }}>
+        {formatCoeff(combo.ez_coeff)}
       </div>
     </div>
   )
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-
 interface CombinationsPageProps {
-  c: AppColors;
+  c: AppColors
 }
 
 export default function CombinationsPage({ c }: CombinationsPageProps) {
@@ -92,10 +75,8 @@ export default function CombinationsPage({ c }: CombinationsPageProps) {
   const [apiErr, setApiErr] = useState<string | null>(null)
 
   const abortRef = useRef<AbortController | null>(null)
+  const isReady = !!project.zone && !!project.group && project.zone !== '0'
 
-  const isReady = !!project.zone && !!project.group && project.zone !== "0"
-
-  // Auto-calculate on input changes (400ms debounce)
   useEffect(() => {
     if (!isReady) {
       setResult(null)
@@ -104,25 +85,24 @@ export default function CombinationsPage({ c }: CombinationsPageProps) {
 
     const timer = setTimeout(async () => {
       abortRef.current?.abort()
-      const ctrl = new AbortController()
-      abortRef.current = ctrl
+      const controller = new AbortController()
+      abortRef.current = controller
 
       setLoading(true)
       setApiErr(null)
       try {
-        const res = await computeCombinations(
+        const response = await computeCombinations(
           { zone: project.zone, group: project.group, psi: project.psi },
-          ctrl.signal,
+          controller.signal,
         )
-        setResult(res)
-      } catch (err) {
-        if ((err as { name?: string }).name === "AbortError") return
-        const error = err as Error
-        const msg = error.message.toLowerCase()
+        setResult(response)
+      } catch (error) {
+        if ((error as { name?: string }).name === 'AbortError') return
+        const message = (error as Error).message.toLowerCase()
         setApiErr(
-          msg.includes("failed to fetch") || msg.includes("network")
-            ? "Backend non démarré — uvicorn backend.main:app --reload --port 8000"
-            : error.message,
+          message.includes('failed to fetch') || message.includes('network')
+            ? 'Backend non démarré - lancez `uvicorn backend.main:app --reload --port 8000`.'
+            : (error as Error).message,
         )
       } finally {
         setLoading(false)
@@ -133,159 +113,79 @@ export default function CombinationsPage({ c }: CombinationsPageProps) {
       clearTimeout(timer)
       abortRef.current?.abort()
     }
-  }, [project.zone, project.group, project.psi])
+  }, [isReady, project.group, project.psi, project.zone])
 
   return (
-    <div style={{
-      height: "100%", display: "flex", flexDirection: "column",
-      background: c.bg, fontFamily: "'IBM Plex Sans','Segoe UI',sans-serif",
-      transition: "background 0.2s", overflow: "hidden",
-    }}>
+    <PageShell c={c}>
+      <PageHero
+        eyebrow="Charges sismiques"
+        title="Combinaisons automatiques"
+        description="Surveillez rapidement l’impact de la zone sismique, du groupe d’importance et du coefficient ψ sur les combinaisons réglementaires actives."
+        aside={<>La composante verticale n’est ajoutée que lorsque le seuil réglementaire Av·I l’exige.</>}
+      />
 
-      {/* Header */}
-      <div style={{ padding: "18px 20px 10px", flexShrink: 0 }}>
-        <div style={{ fontSize: 12, letterSpacing: "0.12em", color: c.blue,
-          textTransform: "uppercase", marginBottom: 4, fontWeight: 600 }}>
-          RPA 2024 — §5.2 Eq. 5.1–5.4
-        </div>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: c.text }}>
-          Combinaisons Sismiques
-        </h1>
-        <div style={{ color: c.textSec, fontSize: 13, marginTop: 3 }}>
-          G + ψ·Q ± Ex ± 0.3Ey (± 0.3Ez si Av·I &gt; 0.25)
-        </div>
-      </div>
+      <BadgeStrip
+        items={[
+          { label: 'Zone', value: project.zone || '—', color: c.blue },
+          { label: 'Groupe', value: project.group || '—', color: c.purple },
+          { label: 'ψ', value: project.psi.toFixed(2), color: c.amber },
+        ]}
+      />
 
-      {/* No project params yet */}
-      {!isReady && (
-        <div style={{
-          flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
-          justifyContent: "center", gap: 12, color: c.textMuted, padding: 32,
-        }}>
-          <div style={{ fontSize: 36 }}>🔗</div>
-          <div style={{
-            fontSize: 14, color: c.textSec, textAlign: "center", maxWidth: 420, lineHeight: 1.6,
-          }}>
-            Veuillez d'abord définir la zone sismique et le groupe d'importance dans les{" "}
-            <b style={{ color: c.blue }}>Paramètres du projet</b>.
-          </div>
-        </div>
-      )}
+      {!isReady ? (
+        <StateBanner tone="warning">
+          Définissez d’abord la zone sismique et le groupe d’importance dans les paramètres généraux avant d’ouvrir cette vue.
+        </StateBanner>
+      ) : null}
 
-      {isReady && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", padding: "0 20px 16px" }}>
+      {apiErr ? <StateBanner tone="danger">{apiErr}</StateBanner> : null}
+      {loading ? <StateBanner tone="info">Calcul des combinaisons en cours…</StateBanner> : null}
 
-          {/* Summary card */}
-          {result && (
-            <div style={{
-              background: c.surface, border: `1px solid ${c.border}`,
-              borderRadius: 12, padding: "12px 16px", marginBottom: 12, flexShrink: 0,
-              display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap",
-            }}>
-              {[
-                { l: "Zone", v: project.zone, col: c.blue },
-                { l: "Groupe", v: project.group, col: c.purple },
-                { l: "ψ", v: result.psi.toFixed(2), col: c.amber },
-                { l: "Av·I", v: result.av_i.toFixed(3), col: result.include_vertical ? c.red : c.green },
-                {
-                  l: "Composante verticale",
-                  v: result.include_vertical ? "Oui" : "Non",
-                  col: result.include_vertical ? c.red : c.green,
-                },
-                { l: "Combinaisons", v: String(result.total_count), col: c.blue },
-              ].map(b => (
-                <div key={b.l} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <div style={{ fontSize: 10, color: c.textMuted, textTransform: "uppercase",
-                    letterSpacing: "0.06em", fontWeight: 600 }}>
-                    {b.l}
-                  </div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: b.col, fontFamily: "monospace" }}>
-                    {b.v}
-                  </div>
-                </div>
+      {result ? (
+        <>
+          <BadgeStrip
+            items={[
+              { label: 'Av·I', value: result.av_i.toFixed(3), color: result.include_vertical ? c.red : c.green },
+              { label: 'Composante verticale', value: result.include_vertical ? 'Oui' : 'Non', color: result.include_vertical ? c.red : c.green },
+              { label: 'Combinaisons', value: String(result.total_count), color: c.blue },
+            ]}
+          />
+
+          {result.include_vertical ? (
+            <StateBanner tone="warning">
+              La composante verticale est incluse : Av·I = <strong>{result.av_i.toFixed(3)}</strong> &gt; 0.25.
+            </StateBanner>
+          ) : null}
+
+          <SurfacePanel eyebrow="Tableau de sortie" title="Liste des combinaisons" flushTop>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '36px 60px minmax(220px, 1fr) 56px 56px 56px',
+                gap: 8,
+                padding: '0 12px 10px',
+                color: c.textMuted,
+                fontSize: 10,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                fontWeight: 700,
+              }}
+            >
+              <div style={{ textAlign: 'right' }}>N°</div>
+              <div style={{ textAlign: 'center' }}>Réf.</div>
+              <div>Combinaison</div>
+              <div style={{ textAlign: 'center', color: c.blue }}>Ex</div>
+              <div style={{ textAlign: 'center', color: c.purple }}>Ey</div>
+              <div style={{ textAlign: 'center', color: c.amber }}>Ez</div>
+            </div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {result.combinations.map((combo, idx) => (
+                <ComboRow key={combo.id} combo={combo} idx={idx} c={c} />
               ))}
-
-              {result.include_vertical && (
-                <div style={{
-                  marginLeft: "auto", background: c.red + "15",
-                  border: `1px solid ${c.red}44`, borderRadius: 8,
-                  padding: "6px 12px", fontSize: 12, color: c.red,
-                }}>
-                  ⚠️ Av·I = {result.av_i.toFixed(3)} &gt; 0.25 — composante Ez incluse (24 combinaisons)
-                </div>
-              )}
             </div>
-          )}
-
-          {loading && (
-            <div style={{ fontSize: 13, color: c.textMuted, marginBottom: 10, fontStyle: "italic", flexShrink: 0 }}>
-              Calcul en cours…
-            </div>
-          )}
-
-          {apiErr && (
-            <div style={{
-              background: c.red + "15", border: `1px solid ${c.red}44`,
-              borderRadius: 8, padding: "10px 12px", fontSize: 11, color: c.red,
-              lineHeight: 1.5, marginBottom: 12, flexShrink: 0,
-            }}>
-              ❌ {apiErr}
-            </div>
-          )}
-
-          {/* Table */}
-          {result && (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden",
-              background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12 }}>
-
-              {/* Table header */}
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "32px 56px 1fr 52px 52px 52px",
-                gap: 6, padding: "8px 10px",
-                borderBottom: `1px solid ${c.border}`,
-                flexShrink: 0,
-              }}>
-                {[
-                  { l: "N°",       col: c.textMuted },
-                  { l: "Réf.",     col: c.textMuted },
-                  { l: "Combinaison", col: c.textMuted },
-                  { l: "Ex",       col: c.blue },
-                  { l: "Ey",       col: c.purple },
-                  { l: "Ez",       col: c.amber },
-                ].map(h => (
-                  <div key={h.l} style={{
-                    fontSize: 10, fontWeight: 700, color: h.col,
-                    textTransform: "uppercase", letterSpacing: "0.06em",
-                    textAlign: h.l === "Combinaison" ? "left" : "center",
-                  }}>
-                    {h.l}
-                  </div>
-                ))}
-              </div>
-
-              {/* Scrollable rows */}
-              <div style={{ flex: 1, overflowY: "auto", padding: "6px 6px 10px", display: "flex", flexDirection: "column", gap: 3 }}>
-                {result.combinations.map((combo, idx) => (
-                  <ComboRow key={combo.id} combo={combo} idx={idx} c={c} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!result && !loading && !apiErr && (
-            <div style={{
-              flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
-              justifyContent: "center", gap: 12, color: c.textMuted,
-            }}>
-              <div style={{ fontSize: 36 }}>🔗</div>
-              <div style={{ fontSize: 14, color: c.textSec }}>
-                Chargement des combinaisons…
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+          </SurfacePanel>
+        </>
+      ) : null}
+    </PageShell>
   )
 }

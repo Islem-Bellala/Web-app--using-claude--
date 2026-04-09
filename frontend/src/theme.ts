@@ -1,19 +1,35 @@
 import type { AppColors } from './types'
 
 export const DARK: AppColors = {
-  bg:'#020817', surface:'#0a1628', elevated:'#0f172a',
-  border:'#1e293b', borderLight:'#475569',
-  text:'#f1f5f9', textSec:'#cbd5e1', textMuted:'#94a3b8',
-  blue:'#60a5fa', green:'#34d399', amber:'#fbbf24',
-  red:'#f87171', purple:'#c4b5fd',
+  bg: '#06111d',
+  surface: '#0d1b2b',
+  elevated: '#122338',
+  border: '#22384f',
+  borderLight: '#3f5770',
+  text: '#eff5ff',
+  textSec: '#c1d2e6',
+  textMuted: '#7f96ad',
+  blue: '#56a3ff',
+  green: '#27c49a',
+  amber: '#ffbb55',
+  red: '#ff7d71',
+  purple: '#8b9bff',
 }
 
 export const LIGHT: AppColors = {
-  bg:'#f8fafc', surface:'#ffffff', elevated:'#f1f5f9',
-  border:'#e2e8f0', borderLight:'#cbd5e1',
-  text:'#0f172a', textSec:'#475569', textMuted:'#94a3b8',
-  blue:'#2563eb', green:'#059669', amber:'#d97706',
-  red:'#dc2626', purple:'#7c3aed',
+  bg: '#f3f7fb',
+  surface: '#ffffff',
+  elevated: '#edf3f8',
+  border: '#d6e1ec',
+  borderLight: '#b9c9da',
+  text: '#08111d',
+  textSec: '#3f5368',
+  textMuted: '#6d8197',
+  blue: '#2563eb',
+  green: '#0f9f7f',
+  amber: '#c87c16',
+  red: '#d9493e',
+  purple: '#5d68ff',
 }
 
 export function getColors(isDark: boolean): AppColors {

@@ -1,10 +1,4 @@
-/**
- * Bunyan — Login / Register Page
- * Full-page auth form. NOT inside the sidebar+topbar shell.
- * French UI text, works with dark/light theme system.
- */
-
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import type { AppColors } from '../../types'
 
@@ -14,180 +8,153 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ c, isDark }: LoginPageProps) {
-  const [mode, setMode]           = useState<'login' | 'register'>('login')
-  const [email, setEmail]         = useState('')
-  const [password, setPassword]   = useState('')
-  const [fullName, setFullName]   = useState('')
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
 
   const { login, register, isLoading, error, clearError } = useAuthStore()
 
   function handleToggle() {
-    setMode(m => m === 'login' ? 'register' : 'login')
+    setMode((current) => (current === 'login' ? 'register' : 'login'))
     clearError()
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
     if (mode === 'login') {
       await login(email, password)
-    } else {
-      await register(email, password, fullName || undefined)
+      return
     }
+    await register(email, password, fullName || undefined)
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '10px 12px',
-    background: c.elevated,
-    border: `1px solid ${c.border}`,
-    borderRadius: 8,
-    color: c.text,
-    fontSize: 14,
-    outline: 'none',
-    boxSizing: 'border-box',
-  }
-
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: 12,
-    color: c.textSec,
-    marginBottom: 5,
-  }
+  const vars = {
+    '--page-bg': c.bg,
+    '--page-bg-soft': `${c.elevated}ee`,
+    '--page-surface': c.surface,
+    '--page-elevated': c.elevated,
+    '--page-border': c.border,
+    '--page-text': c.text,
+    '--page-text-sec': c.textSec,
+    '--page-text-muted': c.textMuted,
+    '--page-blue': c.blue,
+    '--page-green': c.green,
+    '--page-amber': c.amber,
+    '--page-red': c.red,
+    '--page-purple': c.purple,
+  } as CSSProperties
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: c.bg,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 20,
-    }}>
-      <div style={{
-        background: c.surface,
-        border: `1px solid ${c.border}`,
-        borderRadius: 14,
-        padding: '36px 32px',
-        width: '100%',
-        maxWidth: 380,
-      }}>
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: c.text, letterSpacing: '-0.02em' }}>
-            بنيان Bunyan
+    <div className="auth-shell" style={vars}>
+      <div className="auth-layout">
+        <section className="auth-showcase">
+          <div className="auth-showcase__eyebrow">Plateforme de vérification structurale</div>
+          <div className="auth-showcase__title">
+            <span className="font-arabic">بنيان</span> Bunyan
           </div>
-          <div style={{ fontSize: 11, color: c.textMuted, marginTop: 3 }}>
-            RPA 2024 · CBA93 · BAEL91
+          <div className="auth-showcase__body">
+            Un environnement de travail conçu pour des ingénieurs structure, avec un parcours plus clair, des
+            écrans plus lisibles et une lecture technique plus rapide des résultats.
           </div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: c.text, marginTop: 18 }}>
-            {mode === 'login' ? 'Connexion' : 'Inscription'}
-          </div>
-        </div>
 
-        {/* Error */}
-        {error && (
-          <div style={{
-            background: isDark ? '#3b0f0f' : '#fef2f2',
-            border: `1px solid ${c.red}`,
-            borderRadius: 8,
-            padding: '10px 12px',
-            fontSize: 13,
-            color: c.red,
-            marginBottom: 18,
-          }}>
-            {error}
+          <div className="auth-feature-list">
+            <div className="auth-feature">
+              <strong>Workflow guidé</strong>
+              <span>Des paramètres généraux jusqu’aux vérifications sismiques, chaque écran suit le même langage visuel.</span>
+            </div>
+            <div className="auth-feature">
+              <strong>Calculs inchangés</strong>
+              <span>Cette refonte améliore l’interface et l’expérience sans modifier la logique métier ni les formules.</span>
+            </div>
+            <div className="auth-feature">
+              <strong>Prêt pour le quotidien</strong>
+              <span>Lisibilité, retours de statut et responsive solide pour reprendre rapidement un projet en cours.</span>
+            </div>
           </div>
-        )}
+        </section>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {mode === 'register' && (
-            <div>
-              <label style={labelStyle}>Nom complet</label>
+        <section className="auth-card">
+          <div className="auth-card__brand">
+            <strong>
+              <span className="font-arabic">بنيان</span> Bunyan
+            </strong>
+            <span>RPA 2024 · CBA93 · BAEL91</span>
+          </div>
+
+          <div className="auth-card__heading">
+            <h1>{mode === 'login' ? 'Connexion sécurisée' : 'Créer un compte'}</h1>
+            <p>
+              {mode === 'login'
+                ? 'Rouvrez vos projets, vérifiez votre session et reprenez vos contrôles sans friction.'
+                : 'Créez votre accès Bunyan pour gérer vos projets et centraliser les vérifications structurales.'}
+            </p>
+          </div>
+
+          {error ? <div className="auth-alert">{error}</div> : null}
+
+          <form className="auth-form" onSubmit={handleSubmit}>
+            {mode === 'register' ? (
+              <div className="auth-field">
+                <label htmlFor="full-name">Nom complet</label>
+                <input
+                  id="full-name"
+                  className="auth-input"
+                  type="text"
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  placeholder="Optionnel"
+                  autoComplete="name"
+                />
+              </div>
+            ) : null}
+
+            <div className="auth-field">
+              <label htmlFor="email">Adresse e-mail</label>
               <input
-                type="text"
-                value={fullName}
-                onChange={e => setFullName(e.target.value)}
-                placeholder="Optionnel"
-                style={inputStyle}
-                autoComplete="name"
+                id="email"
+                className="auth-input"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+                placeholder="vous@exemple.com"
+                autoComplete="email"
               />
             </div>
-          )}
 
-          <div>
-            <label style={labelStyle}>Adresse e-mail</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              placeholder="vous@exemple.com"
-              style={inputStyle}
-              autoComplete="email"
-            />
+            <div className="auth-field">
+              <label htmlFor="password">Mot de passe</label>
+              <input
+                id="password"
+                className="auth-input"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                placeholder="••••••••"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              />
+            </div>
+
+            <button type="submit" className="auth-button" disabled={isLoading}>
+              {isLoading ? 'Chargement…' : mode === 'login' ? 'Se connecter' : 'Créer le compte'}
+            </button>
+          </form>
+
+          <div className="auth-toggle">
+            {mode === 'login' ? 'Pas encore de compte ? ' : 'Déjà inscrit ? '}
+            <button type="button" onClick={handleToggle}>
+              {mode === 'login' ? 'Créer un accès' : 'Revenir à la connexion'}
+            </button>
           </div>
 
-          <div>
-            <label style={labelStyle}>Mot de passe</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-              style={inputStyle}
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            style={{
-              width: '100%',
-              padding: '11px',
-              background: isLoading ? c.borderLight : c.blue,
-              border: 'none',
-              borderRadius: 8,
-              color: '#fff',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: isLoading ? 'default' : 'pointer',
-              marginTop: 4,
-              transition: 'background 0.15s',
-            }}
-          >
-            {isLoading
-              ? 'Chargement…'
-              : mode === 'login' ? 'Se connecter' : "S'inscrire"}
-          </button>
-        </form>
-
-        {/* Toggle */}
-        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: c.textMuted }}>
-          {mode === 'login' ? (
-            <>
-              Pas de compte ?{' '}
-              <button type="button" onClick={handleToggle} style={{
-                background: 'none', border: 'none', color: c.blue,
-                cursor: 'pointer', fontSize: 13, padding: 0,
-              }}>
-                Inscrivez-vous
-              </button>
-            </>
-          ) : (
-            <>
-              Déjà inscrit ?{' '}
-              <button type="button" onClick={handleToggle} style={{
-                background: 'none', border: 'none', color: c.blue,
-                cursor: 'pointer', fontSize: 13, padding: 0,
-              }}>
-                Connectez-vous
-              </button>
-            </>
+          {!isDark ? null : (
+            <div className="auth-toggle">
+              Le mode sombre est actif. Vous pourrez le modifier une fois connecté depuis l’en-tête principal.
+            </div>
           )}
-        </div>
+        </section>
       </div>
     </div>
   )

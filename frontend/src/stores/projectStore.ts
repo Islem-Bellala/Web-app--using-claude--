@@ -132,7 +132,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setLx: (lx) => set({ lx }),
   setLy: (ly) => set({ ly }),
   setMu: (mu) => set({ mu }),
-  setProjectMeta: (meta) => set((state) => ({ ...state, ...meta })),
+  setProjectMeta: (meta) =>
+    set((state) => {
+      const nextProjectName = meta.projectName ?? state.projectName;
+
+      return {
+        ...state,
+        ...meta,
+        currentProjectName: meta.projectName !== undefined ? nextProjectName : state.currentProjectName,
+        projects:
+          meta.projectName !== undefined && state.currentProjectId
+            ? state.projects.map((project) =>
+                project.id === state.currentProjectId ? { ...project, name: nextProjectName } : project
+              )
+            : state.projects,
+      };
+    }),
   resetProject: () => set({
     ...initialState,
     wilayas: get().wilayas,        // keep loaded reference data

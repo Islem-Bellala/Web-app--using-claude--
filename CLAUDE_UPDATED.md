@@ -198,16 +198,17 @@ Each layer is independent and testable.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  TOPBAR (48px): بنيان Bunyan + project + save + user    │
+│  TOPBAR: بنيان Bunyan │ page context │ Projet actif:ADM│
+│         RPA·CBA·BAEL  │              │ [Save] [☀] [IS] │
 ├────────┬────────────────────────────────────────────────┤
 │        │                                                │
 │  SIDE  │         MAIN CONTENT AREA                      │
 │  BAR   │                                                │
-│ (~200px│    Everything visible at once.                  │
-│  nav)  │    No full-page scrolling.                     │
-│        │    Only <main> scrolls.                        │
-│ Grouped│    Panels, cards, tabs for overflow.            │
-│ by code│                                                │
+│ (270px │    Everything visible at once.                  │
+│  icons │    No full-page scrolling.                     │
+│  +     │    Only <main> scrolls.                        │
+│  labels│    Panels, cards, tabs for overflow.            │
+│  only) │                                                │
 │        │                                                │
 │ BIENTÔT│                                                │
 │ tags   │                                                │
@@ -245,29 +246,28 @@ Each layer is independent and testable.
 - Fluid interactions, minimal manual effort, minimal cognitive load
 - Intuitive data visualization (tables, charts, diagrams)
 
-### 4.3 ProjectParams — Two-Row Layout
+### 4.3 ProjectParams — Two-Column Layout
 
-The ProjectParams page uses a two-row layout to fit within the viewport:
+The ProjectParams page uses a context strip + two-column card layout:
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│ ROW 1 — Inputs (flex: 0 0 58%, 3 columns)                  │
-│                                                            │
-│  Col 1 (210px)    Col 2 (250px)    Col 3 (flex: 1)        │
-│  IDENTIFICATION   SISMIQUE         GÉOMÉTRIE ET MASSES     │
-│  Nom, ingénieur   Wilaya, commune  Stories table           │
-│  référence, date  zone, site       (N, H, W)              │
-│                   groupe, QF/R     Poids total, hn         │
-│                                                            │
-│  Each column: overflow-y: auto (independent scroll)        │
+│ HEADER: "Bunyan - Paramètres"                              │
 ├────────────────────────────────────────────────────────────┤
-│ ROW 2 — Results (flex: 1, full width)                      │
-│                                                            │
-│  4 — RÉSULTATS ANALYSE DYNAMIQUE                           │
-│  Left (320px): Tx/Ty/Vxd/Vyd 2×2 grid + status checklist  │
-│  Right (flex: 1): drx/dry displacements table (scrollable) │
-└────────────────────────────────────────────────────────────┘
+│ CONTEXT STRIP (3 read-only items):                         │
+│  [Projet: ADM]  [Ingénieur: —]  [Réf: —]                  │
+├──────────────────────────┬─────────────────────────────────┤
+│ 1 — PARAMÈTRES SISMIQUES │ 2 — GÉOMÉTRIE ET MASSES         │
+│ Localité (wilaya/zone)   │ Stories table (N, H, W, δek)    │
+│ Classification            │ Totals (W, h_n)                 │
+│ Coefficients (QF, R)     │ 3 — Résultats analyse dynamique │
+│ Géométrie en plan        │ Tx, Ty, Vxd, Vyd                │
+└──────────────────────────┴─────────────────────────────────┘
 ```
+
+The Identification card was removed — those fields (projectName, engineer, reference, date)
+are now edited on the Projects page (ProjectList.tsx). The context strip provides read-only
+project identity at a glance.
 
 ### 4.4 Color Tokens (Tailwind v4)
 
@@ -279,24 +279,27 @@ exports `DARK` and `LIGHT` constants and a `getColors()` helper.
 
 ### 4.5 Sidebar Navigation Structure
 
+Navigation items use Unicode icons (no text abbreviations) and labels only (descriptions removed).
+The "Flux de travail stabilisé" intro box has been removed for a cleaner sidebar.
+
 ```
 GÉNÉRAL
-  ├── Projets
-  └── Paramètres généraux
+  ▦ Projets
+  ⚙ Paramètres généraux
 
 SISMIQUE — RPA 2024
-  ├── Spectre de réponse          ← standalone page (SpectrumChart.tsx)
-  ├── Combinaisons                ← standalone page (CombinationsPage.tsx) — NEW
-  └── Vérification sismique       ← tabbed page (SeismicVerificationPage.tsx) — NEW
+  ∿ Spectre de réponse          ← standalone page (SpectrumChart.tsx)
+  ⊕ Combinaisons                ← standalone page (CombinationsPage.tsx)
+  ✔ Vérification sismique       ← tabbed page (SeismicVerificationPage.tsx)
         ├── tab: Effort V            (base shear V + 80% check)
         ├── tab: Déplacements        (Dk + inter-story drift limits)
         ├── tab: P-Δ                 (θk stability check)
         └── tab: Renversement        (overturning + sliding)
 
 FERRAILLAGE BA
-  ├── Poutres — CBA93             BIENTÔT
-  ├── Poteaux — CBA93             BIENTÔT
-  └── Voiles — CBA93              BIENTÔT
+  ─ Poutres — CBA93             BIENTÔT
+  │ Poteaux — CBA93             BIENTÔT
+  █ Voiles — CBA93              BIENTÔT
 
 CONNEXION
   ├── Robot Structural            BIENTÔT
@@ -451,19 +454,23 @@ bunyan/                                    # Project root
 │       ├── services/
 │       │   └── api.ts                   # Typed fetch + AbortController + 401→refresh→retry
 │       ├── styles/
-│       │   └── globals.css              # @import "tailwindcss", @theme block, dark mode
+│       │   ├── globals.css              # @import "tailwindcss", @theme block, dark mode
+│       │   ├── shell.css                # App layout shell (topbar, sidebar, nav items)
+│       │   └── pages.css                # Page-level styles (project list, login)
 │       └── components/
 │           ├── auth/
 │           │   └── LoginPage.tsx         # Full-page login (outside Layout)
 │           ├── layout/
 │           │   ├── Layout.tsx            # Fixed viewport: 100vh × 100vw overflow-hidden
-│           │   ├── Topbar.tsx            # 48px: logo, project name, save, theme, user
-│           │   └── Sidebar.tsx           # Nav groups, BIENTÔT tags, logout, theme toggle
+│           │   ├── Topbar.tsx            # Brand, page context, inline project pill, save, theme, user
+│           │   ├── Sidebar.tsx           # Icon + label nav items, BIENTÔT tags, section groups
+│           │   └── navigation.ts         # NavItem/NavGroup types, NAV_GROUPS config, PAGE_META
 │           ├── shared/
+│           │   ├── PageChrome.tsx        # Shared page chrome (PageShell, PageHero, BadgeStrip, etc.)
 │           │   ├── QFModal.tsx           # Quality factor modal (controlled component)
 │           │   └── RModal.tsx            # Behavior factor modal (controlled component)
 │           ├── general/
-│           │   ├── ProjectParams.tsx     # Two-row layout (3 input cols + results row)
+│           │   ├── ProjectParams.tsx     # Context strip + 2-col layout (seismic + geometry cards)
 │           │   └── ProjectList.tsx       # Project selection / create new
 │           └── seismic/
 │               ├── SpectrumChart.tsx     # Sad + Svd charts, X/Y directions, .txt export
@@ -569,7 +576,7 @@ bunyan/                                    # Project root
 | App.tsx | authStore (isAuthenticated) |
 | Layout.tsx | uiStore (sidebarOpen, activePage) |
 | Topbar.tsx | projectStore + authStore + uiStore |
-| Sidebar.tsx | uiStore + authStore |
+| Sidebar.tsx | uiStore + projectStore |
 | ProjectParams | projectStore + seismicStore + structuralStore |
 | SpectrumChart | projectStore + seismicStore |
 | BaseShearPage | projectStore + seismicStore + structuralStore |
@@ -736,7 +743,7 @@ Errors must be descriptive, logged, and user-friendly (in French).
 
 - ✅ `LoginPage` — full-page login (outside Layout)
 - ✅ `ProjectList` — project selection / create new
-- ✅ `ProjectParams` — two-row layout (3 input cols + results row)
+- ✅ `ProjectParams` — context strip + 2-col layout (seismic + geometry/masses cards)
 - ✅ `SpectrumChart` — Sad + Svd charts, X/Y directions, .txt export
 - ✅ `CombinationsPage` — seismic load combinations table
 - ✅ `SeismicVerificationPage` — 4 horizontal tabs:
@@ -786,8 +793,12 @@ Errors must be descriptive, logged, and user-friendly (in French).
 - ⬜ Use v1 on real projects, collect feedback from friends
 - ⬜ Fix critical bugs surfaced by real usage
 
-**v2 — Polish Pass** (after bridge + real usage)
-- ⬜ Frontend UI/UX overhaul page by page
+**v2 — Polish Pass** (in progress on Bunyan-V2 branch)
+- ✅ ProjectParams: removed Identification card, added read-only context strip, 2-col layout
+- ✅ ProjectList: identification fields (name, engineer, reference) managed here
+- ✅ Sidebar: removed intro box, replaced text codes with icons, removed descriptions
+- ✅ Topbar: inline project pill ("Projet actif : ADM" on one line)
+- ⬜ Continue UI/UX overhaul page by page
 - ⬜ Calculation corrections based on real project validation
 - ⬜ Social media launch
 

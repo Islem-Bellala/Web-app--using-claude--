@@ -1,83 +1,74 @@
-import { useUIStore } from '../../stores/uiStore'
 import { useAuthStore } from '../../stores/authStore'
 import { useProjectStore } from '../../stores/projectStore'
-import { getColors } from '../../theme'
+import { useUIStore } from '../../stores/uiStore'
+import { PAGE_META } from './navigation'
 
 export default function Topbar() {
-  const { theme, toggleTheme } = useUIStore()
+  const { activePage, sidebarOpen, setSidebarOpen, theme, toggleTheme } = useUIStore()
   const { user, logout } = useAuthStore()
   const { currentProjectId, currentProjectName, isSaving, saveCurrentProject } = useProjectStore()
 
-  const isDark = theme === 'dark'
-  const c = getColors(isDark)
-
-  const initials = user
-    ? (user.full_name ?? user.email).slice(0, 2).toUpperCase()
-    : '?'
+  const meta = PAGE_META[activePage] ?? PAGE_META.default
+  const initials = user ? (user.full_name ?? user.email).slice(0, 2).toUpperCase() : 'BN'
+  const userLabel = user?.full_name?.trim() || user?.email || 'Compte'
 
   return (
-    <header style={{
-      height: 48, flexShrink: 0,
-      background: c.surface,
-      borderBottom: `1px solid ${c.border}`,
-      display: 'flex', alignItems: 'center',
-      padding: '0 16px', gap: 12,
-      transition: 'background 0.2s, border-color 0.2s',
-    }}>
-      {/* Logo */}
-      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 120 }}>
-        <span style={{ fontSize: 15, fontWeight: 700, color: c.text, letterSpacing: '-0.02em', lineHeight: 1 }}>
-          بنيان Bunyan
-        </span>
-        <span style={{ fontSize: 9, color: c.textMuted, marginTop: 1 }}>
-          RPA 2024 · CBA93 · BAEL91
-        </span>
+    <header className="app-topbar">
+      <button
+        type="button"
+        className="app-topbar__menu"
+        aria-label={sidebarOpen ? 'Fermer la navigation' : 'Ouvrir la navigation'}
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+      >
+        {sidebarOpen ? '×' : '≡'}
+      </button>
+
+      <div className="app-brand">
+        <div className="app-brand__title">
+          <span className="font-arabic">بنيان</span> Bunyan
+        </div>
+        <div className="app-brand__subtitle">RPA 2024 · CBA93 · BAEL91</div>
       </div>
 
-      {/* Project name — center */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {currentProjectId && (
-          <span style={{ fontSize: 13, color: c.textSec }}>
-            Projet : <strong style={{ color: c.text }}>{currentProjectName}</strong>
-          </span>
-        )}
+      <div className="app-topbar__center">
+        <div className="app-context">
+          <div className="app-context__eyebrow">{meta.eyebrow}</div>
+          <div className="app-context__title">{meta.title}</div>
+          <div className="app-context__subtitle">{meta.description}</div>
+        </div>
       </div>
 
-      {/* Right controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {currentProjectId && (
-          <button type="button" onClick={saveCurrentProject} disabled={isSaving} style={{
-            background: isSaving ? c.borderLight : c.green,
-            border: 'none', borderRadius: 6, padding: '4px 12px',
-            color: '#fff', fontSize: 12, fontWeight: 600,
-            cursor: isSaving ? 'default' : 'pointer',
-          }}>
+      <div className="app-topbar__actions">
+        {currentProjectId ? (
+          <div className="app-project-pill">
+            <span className="app-project-pill__label">Projet actif</span>
+            <span className="app-project-pill__sep">:</span>
+            <span className="app-project-pill__value">{currentProjectName || 'Projet sans nom'}</span>
+          </div>
+        ) : null}
+
+        {currentProjectId ? (
+          <button type="button" className="app-action-button" onClick={saveCurrentProject} disabled={isSaving}>
             {isSaving ? 'Sauvegarde…' : 'Sauvegarder'}
           </button>
-        )}
+        ) : null}
 
-        <button type="button" onClick={toggleTheme} style={{
-          background: c.elevated, border: `1px solid ${c.border}`,
-          borderRadius: 7, padding: '4px 10px', cursor: 'pointer',
-          color: c.textSec, fontSize: 12,
-        }}>
-          {isDark ? '☀️' : '🌙'}
+        <button
+          type="button"
+          className="app-secondary-button"
+          onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Passer au thème clair' : 'Passer au thème sombre'}
+          title={theme === 'dark' ? 'Passer au thème clair' : 'Passer au thème sombre'}
+        >
+          {theme === 'dark' ? '☀' : '☾'}
         </button>
 
-        <div style={{
-          width: 28, height: 28, borderRadius: '50%',
-          background: c.blue, display: 'flex', alignItems: 'center',
-          justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff',
-          flexShrink: 0,
-        }}>
-          {initials}
-        </div>
-
-        <button type="button" onClick={logout} style={{
-          background: 'none', border: 'none', color: c.textMuted,
-          cursor: 'pointer', fontSize: 12, padding: 0,
-        }}>
-          Déconnexion
+        <button type="button" className="app-account-button" onClick={logout} title="Se déconnecter">
+          <span className="app-account-button__avatar">{initials}</span>
+          <span className="app-account-button__label">
+            <strong>{userLabel}</strong>
+            <span>Déconnexion</span>
+          </span>
         </button>
       </div>
     </header>
